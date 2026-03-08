@@ -1,81 +1,88 @@
 # F1 Australian GP 2026 Winner Prediction
 
-ML model to predict the winner of the 2026 Formula 1 Australian Grand Prix using weighted ensemble scoring, FastF1 telemetry, and Monte Carlo simulation.
+ML model to predict the winner of the 2026 Formula 1 Australian Grand Prix. 100% data-driven. Zero betting market data.
 
-## Prediction Result
+## Prediction
 
-**George Russell (Mercedes) - 62% win probability** from P1 on grid.
+**George Russell (Mercedes) - 78.06% win probability** from P1 on grid.
 
-50,000 Monte Carlo race simulations. 13 engineered features. Real qualifying and practice data from the 2026 Australian GP weekend.
+100,000 Monte Carlo race simulations. 13 engineered features. All derived from official F1 qualifying, practice, and historical race data.
+
+| # | Driver | Team | Grid | Win% | Podium% |
+|---|--------|------|------|------|---------|
+| 1 | George Russell | Mercedes | P1 | 78.06 | 89.00 |
+| 2 | Lewis Hamilton | Ferrari | P7 | 11.47 | 48.63 |
+| 3 | Kimi Antonelli | Mercedes | P2 | 3.45 | 39.18 |
+| 4 | Charles Leclerc | Ferrari | P4 | 3.04 | 37.46 |
+| 5 | Lando Norris | McLaren | P6 | 1.28 | 22.30 |
+| 6 | Oscar Piastri | McLaren | P5 | 1.25 | 21.71 |
+| 7 | Isack Hadjar | Red Bull | P3 | 0.52 | 11.24 |
+| 8 | Max Verstappen | Red Bull | P20 | 0.43 | 12.37 |
 
 ## How It Works
 
-The model runs in 4 stages:
+**Stage 1: Data Collection.** Qualifying lap times, FP1/FP2/FP3 session times, historical Albert Park results (2007-2025), driver career stats, and team race pace from long-run simulations.
 
-**1. Data Collection** - Pulls qualifying results, practice session lap times, sector times, speed trap data, and weather conditions from F1's live timing API via FastF1. Falls back to manually collected data if the API is unavailable.
+**Stage 2: Feature Engineering.** 13 features per driver, all normalized 0.0 to 1.0.
 
-**2. Feature Engineering** - Transforms raw timing data into 13 normalized features (0.0 to 1.0 scale) for each of the 22 drivers on the grid.
+**Stage 3: Model Scoring.** Weighted ensemble with softmax normalization (temperature = 0.12, calibrated to Albert Park's historical 60% pole-win rate).
 
-**3. Model Scoring** - Weighted ensemble scoring with softmax normalization converts features into win probabilities.
+**Stage 4: Monte Carlo Simulation.** 100,000 race simulations with safety cars (60%), virtual safety cars (25%), rain (15%), lap 1 incidents (30%), mechanical DNFs (6%), driver errors (3%), and strategy variance.
 
-**4. Monte Carlo Simulation** - 50,000 race simulations model random events: safety cars (60% probability), rain (15%), mechanical DNFs (8%), and first-lap incidents (25%).
+## Features (13 total, zero betting data)
 
-## Features
+| Feature | Weight | Source |
+|---------|--------|--------|
+| Qualifying pace (time gap to pole) | 28% | Official qualifying times |
+| Team race pace (FP2 long-run deficit) | 14% | Practice session data |
+| Historical grid-position win rate | 12% | Albert Park results 1996-2025 |
+| FP2 race simulation pace | 10% | Practice high-fuel runs |
+| Qualifying vs practice extraction | 5% | Delta between Q and FP times |
+| Teammate qualifying gap | 5% | Intra-team time difference |
+| Career win rate | 5% | Official career statistics |
+| Reliability | 5% | Weekend crash/mechanical data |
+| Practice improvement trend | 4% | FP1 to FP3 time progression |
+| Recent form (2025 season) | 4% | Last season results |
+| Australian GP track record | 3% | Circuit-specific win/podium rate |
+| Lap 1 start safety | 3% | Grid position risk factor |
+| Rain skill | 2% | Experience-based wet ability |
 
-| Feature | Weight | Description |
-|---------|--------|-------------|
-| Grid Position | 22-25% | Qualifying result (pole = 1.0) |
-| Market Odds | 18-20% | Betting implied probability from sportsbooks |
-| Team Strength | 13-15% | Car performance from testing and practice |
-| Practice Pace | 8-10% | Average FP1/FP2/FP3 ranking |
-| Experience | 6-7% | Career wins, podiums, poles, seasons |
-| Reliability | 6-7% | Weekend mechanical issues or crashes |
-| Sector Balance | 5% | Consistency across track sectors (FastF1) |
-| Track Knowledge | 4-5% | Historical Australian GP results |
-| Consistency | 4-5% | Practice session variance |
-| Speed Advantage | 4% | Straight-line speed vs field (FastF1) |
-| Lap Completion | 4% | Laps completed vs field max (FastF1) |
-| Teammate Gap | 3% | Intra-team qualifying delta |
-| Quali Improvement | 3% | Practice-to-qualifying delta |
-
-Weights shift depending on whether FastF1 telemetry data is available (13 features) or the model uses static data only (10 features).
+Key design choice: qualifying pace uses the actual time gap in seconds (e.g. 0.8s off pole), not grid position rank. A driver 0.3s off pole is far more competitive than one 2.5s off. Position numbers alone hide this.
 
 ## Project Structure
 
 ```
 f1-aus-gp-predictor/
 ├── src/
-│   ├── data_loader.py        # Static race data (grid, stats, odds)
-│   ├── fastf1_loader.py      # FastF1 API integration for telemetry
-│   ├── features.py           # Base feature engineering (10 features)
-│   ├── features_enhanced.py  # Enhanced features with FastF1 (13 features)
-│   ├── model.py              # Weighted ensemble + softmax scoring
-│   ├── monte_carlo.py        # Race simulation engine
-│   └── predict.py            # Main entry point
+│   ├── predict_v3.py         # Main model (v3, pure data-driven)
+│   ├── predict.py            # Original model (v1)
+│   ├── data_loader.py        # Static race data
+│   ├── fastf1_loader.py      # FastF1 API integration
+│   ├── features.py           # Base feature engineering
+│   ├── features_enhanced.py  # Enhanced features with FastF1
+│   ├── model.py              # Scoring functions
+│   └── monte_carlo.py        # Simulation engine
 ├── dashboard/
 │   ├── src/App.jsx           # React prediction dashboard
 │   ├── package.json
 │   └── index.html
 ├── data/
-│   └── predictions.json      # Model output
+│   ├── predictions_v3.json   # v3 model output
+│   └── predictions.json      # v1 model output
 ├── tests/
-│   └── test_model.py         # 8 unit tests
+│   └── test_model.py         # Unit tests
 ├── docs/
 │   └── methodology.md        # Detailed methodology
-├── notebooks/                # EDA notebooks
 ├── requirements.txt
-├── .gitignore
-├── LICENSE
 └── README.md
 ```
 
 ## Quick Start
 
-### Python Model
-
 ```bash
 git clone https://github.com/brinda0301/F1-predictions.git
 cd F1-predictions
+
 python -m venv venv
 
 # Windows
@@ -85,12 +92,14 @@ python -m venv venv
 source venv/bin/activate
 
 pip install -r requirements.txt
+
+# Run v3 model (recommended)
+python src/predict_v3.py
+
+# Run original model
 python src/predict.py
-```
 
-### Run Tests
-
-```bash
+# Run tests
 python tests/test_model.py
 ```
 
@@ -102,31 +111,22 @@ npm install
 npm run dev
 ```
 
-## FastF1 Integration
-
-The model uses [FastF1](https://docs.fastf1.dev/) to pull real telemetry from F1's live timing API:
-
-- Qualifying lap times with sector breakdown (S1, S2, S3)
-- Speed trap readings at key track points
-- Practice session lap counts and pace
-- Weather conditions (temperature, wind, rain)
-
-FastF1 data is cached locally in `data/f1_cache/` to avoid repeated API calls. If FastF1 is unavailable or the API has no data for the session, the model falls back to static data in `data_loader.py`.
-
-```python
-from fastf1_loader import load_race_weekend
-
-data = load_race_weekend(2026, "Australia")
-# Returns: grid, practice, lap_times, weather, source
-```
-
 ## Tech Stack
 
 **Model:** Python, NumPy, FastF1, Pandas
 
 **Dashboard:** React, Recharts, Vite
 
-**Data Sources:** F1 live timing API (via FastF1), official qualifying/practice results, betting odds (Caesars, DraftKings, BetMGM), historical race data (2017-2025)
+**Data:** F1 live timing API (via FastF1), official session results, historical race data (1996-2025)
+
+## Model Versions
+
+| Version | Features | Simulations | Betting Data | Accuracy Driver |
+|---------|----------|-------------|--------------|-----------------|
+| v1 | 10 | 50,000 | 20% weight | Position-based |
+| v3 | 13 | 100,000 | None | Time-gap-based |
+
+v3 produces sharper predictions because it uses time gaps instead of position ranks and derives all signal from F1 data.
 
 ## License
 
