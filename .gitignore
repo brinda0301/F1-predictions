@@ -26,3 +26,6 @@ Thumbs.db
 # Env
 .env
 .env.local
+
+# FastF1 cache
+data/f1_cache/
