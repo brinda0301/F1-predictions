@@ -1,61 +1,83 @@
-# F1 Australian GP 2026 Winner Prediction
+# F1 2026 Race Winner Prediction
 
-ML model to predict the winner of the 2026 Formula 1 Australian Grand Prix. 100% data-driven. Zero betting market data.
+ML model to predict Formula 1 race winners. Built for the 2026 Australian Grand Prix season opener. 100% data-driven. Zero betting market data. 2026 regulation-aware.
 
-## Prediction
+## Australian GP Prediction (March 8, 2026)
 
-**George Russell (Mercedes) - 78.06% win probability** from P1 on grid.
+**George Russell (Mercedes) - 59.1% win probability** from P1 on grid.
 
-100,000 Monte Carlo race simulations. 13 engineered features. All derived from official F1 qualifying, practice, and historical race data.
+100,000 Monte Carlo simulations. 10 features. All derived from 2026 qualifying, practice, and pre-season data.
 
-| # | Driver | Team | Grid | Win% | Podium% |
-|---|--------|------|------|------|---------|
-| 1 | George Russell | Mercedes | P1 | 78.06 | 89.00 |
-| 2 | Lewis Hamilton | Ferrari | P7 | 11.47 | 48.63 |
-| 3 | Kimi Antonelli | Mercedes | P2 | 3.45 | 39.18 |
-| 4 | Charles Leclerc | Ferrari | P4 | 3.04 | 37.46 |
-| 5 | Lando Norris | McLaren | P6 | 1.28 | 22.30 |
-| 6 | Oscar Piastri | McLaren | P5 | 1.25 | 21.71 |
-| 7 | Isack Hadjar | Red Bull | P3 | 0.52 | 11.24 |
-| 8 | Max Verstappen | Red Bull | P20 | 0.43 | 12.37 |
+| # | Driver | Team | Grid | Win% | Podium% | DNF% |
+|---|--------|------|------|------|---------|------|
+| 1 | George Russell | Mercedes | P1 | 59.10 | 74.04 | 8.55 |
+| 2 | Lewis Hamilton | Ferrari | P7 | 7.57 | 30.78 | 10.12 |
+| 3 | Charles Leclerc | Ferrari | P4 | 6.63 | 28.52 | 10.41 |
+| 4 | Oscar Piastri | McLaren | P5 | 4.76 | 22.95 | 11.34 |
+| 5 | Kimi Antonelli | Mercedes | P2 | 4.20 | 22.14 | 11.37 |
+| 6 | Lando Norris | McLaren | P6 | 2.35 | 14.84 | 12.50 |
+| 7 | Isack Hadjar | Red Bull | P3 | 2.30 | 14.09 | 13.87 |
+| 8 | Max Verstappen | Red Bull | P20 | 0.56 | 5.07 | 17.97 |
 
 ## How It Works
 
-**Stage 1: Data Collection.** Qualifying lap times, FP1/FP2/FP3 session times, historical Albert Park results (2007-2025), driver career stats, and team race pace from long-run simulations.
+**1. Data Collection.** Qualifying lap times, practice session times (FP1/FP2/FP3), pre-season testing data, driver career stats. All from 2026 sessions.
 
-**Stage 2: Feature Engineering.** 13 features per driver, all normalized 0.0 to 1.0.
+**2. Feature Engineering.** 10 normalized features per driver. Uses qualifying time gaps in seconds (not position rank). A driver 0.3s off pole scores very differently from one 2.5s off.
 
-**Stage 3: Model Scoring.** Weighted ensemble with softmax normalization (temperature = 0.12, calibrated to Albert Park's historical 60% pole-win rate).
+**3. Model Scoring.** Weighted ensemble with softmax normalization. Temperature calibrated to 2026-adjusted pole win rate (45%, down from historical 60% due to active aero).
 
-**Stage 4: Monte Carlo Simulation.** 100,000 race simulations with safety cars (60%), virtual safety cars (25%), rain (15%), lap 1 incidents (30%), mechanical DNFs (6%), driver errors (3%), and strategy variance.
+**4. Monte Carlo Simulation.** 100,000 race simulations with 2026-specific events: safety cars (55%), virtual safety cars (25%), rain (15%), lap 1 incidents (35% with 22-car grid), energy management uncertainty, higher DNF rates for new engine partnerships.
 
-## Features (13 total, zero betting data)
+## 2026 Regulation Adjustments
 
-| Feature | Weight | Source |
-|---------|--------|--------|
-| Qualifying pace (time gap to pole) | 28% | Official qualifying times |
-| Team race pace (FP2 long-run deficit) | 14% | Practice session data |
-| Historical grid-position win rate | 12% | Albert Park results 1996-2025 |
-| FP2 race simulation pace | 10% | Practice high-fuel runs |
-| Qualifying vs practice extraction | 5% | Delta between Q and FP times |
-| Teammate qualifying gap | 5% | Intra-team time difference |
-| Career win rate | 5% | Official career statistics |
-| Reliability | 5% | Weekend crash/mechanical data |
-| Practice improvement trend | 4% | FP1 to FP3 time progression |
-| Recent form (2025 season) | 4% | Last season results |
-| Australian GP track record | 3% | Circuit-specific win/podium rate |
-| Lap 1 start safety | 3% | Grid position risk factor |
-| Rain skill | 2% | Experience-based wet ability |
+The 2026 season introduced the biggest rule change in F1 history. The model accounts for:
 
-Key design choice: qualifying pace uses the actual time gap in seconds (e.g. 0.8s off pole), not grid position rank. A driver 0.3s off pole is far more competitive than one 2.5s off. Position numbers alone hide this.
+| Regulation Change | Model Adjustment |
+|-------------------|-----------------|
+| Active aero replaces DRS | Pole win rate reduced 60% to 45%. Overtake factor 1.4x. |
+| Overtake Mode (within 1s) | Pursuing drivers get energy boost in simulation |
+| 300% more battery power | Energy management uncertainty added as noise |
+| New engine partnerships | Higher DNF rates for Ford/Red Bull, Honda/Aston Martin, Audi, Cadillac |
+| 22-car grid (Cadillac added) | Lap 1 incident probability raised to 35% |
+| New start procedure | Team-specific start advantage (Ferrari +0.3) |
+| Lighter cars (768kg, -30kg) | Higher softmax temperature reflecting more uncertainty |
+
+Historical data is used ONLY where track physics transfer (Albert Park wall locations, corner layout, safety car probability). Old-era grid win rates, team pecking orders, and tire patterns are NOT carried forward.
+
+## Features (v3, zero betting data)
+
+| Feature | Weight | Source | Transfers from old regs? |
+|---------|--------|--------|--------------------------|
+| Qualifying pace (time gap) | 26% | 2026 qualifying | Yes (physics) |
+| FP2 race pace | 16% | 2026 FP2 session | Yes (physics) |
+| Teammate qualifying gap | 8% | 2026 qualifying | Yes (same car comparison) |
+| Energy management readiness | 8% | Pre-season testing laps | No (new for 2026) |
+| Grid-position win rate | 8% | Historical, adjusted for active aero | Partially |
+| Qualifying extraction | 7% | 2026 quali vs practice delta | Yes (driver skill) |
+| Reliability | 7% | 2026 weekend events | Yes (mechanical) |
+| Adaptability | 6% | Reg-change survival count | Yes (driver trait) |
+| Practice trend | 6% | 2026 FP1 to FP3 progression | Yes (physics) |
+| Start procedure | 5% | 2026 pre-season reports | No (new for 2026) |
+
+## Model Evolution
+
+| Version | File | Russell Win% | Betting Data | Key Change |
+|---------|------|-------------|-------------|------------|
+| v1 | predict.py | 62% | 20% weight | Baseline prototype |
+| v2 | predict_v2.py | 78% | None | Pure data, time-gap features |
+| v3 | predict_v3.py | 59% | None | 2026 regulation-aware |
+
+v1 used betting odds as 20% of the model. v2 removed betting data and used time gaps instead of position ranks. v3 adjusted for 2026 regulation changes: active aero reducing pole advantage, energy management uncertainty, higher DNF rates for new engine partnerships.
 
 ## Project Structure
 
 ```
 f1-aus-gp-predictor/
 ├── src/
-│   ├── predict_v3.py         # Main model (v3, pure data-driven)
-│   ├── predict.py            # Original model (v1)
+│   ├── predict_v3.py         # Current model (2026 regulation-aware)
+│   ├── predict_v2.py         # v2 (pure data-driven)
+│   ├── predict.py            # v1 (baseline)
 │   ├── data_loader.py        # Static race data
 │   ├── fastf1_loader.py      # FastF1 API integration
 │   ├── features.py           # Base feature engineering
@@ -64,15 +86,15 @@ f1-aus-gp-predictor/
 │   └── monte_carlo.py        # Simulation engine
 ├── dashboard/
 │   ├── src/App.jsx           # React prediction dashboard
-│   ├── package.json
-│   └── index.html
+│   └── package.json
 ├── data/
-│   ├── predictions_v3.json   # v3 model output
-│   └── predictions.json      # v1 model output
+│   ├── predictions_v3.json   # v3 output
+│   ├── predictions_v2.json   # v2 output
+│   └── predictions.json      # v1 output
 ├── tests/
 │   └── test_model.py         # Unit tests
 ├── docs/
-│   └── methodology.md        # Detailed methodology
+│   └── methodology.md
 ├── requirements.txt
 └── README.md
 ```
@@ -93,13 +115,16 @@ source venv/bin/activate
 
 pip install -r requirements.txt
 
-# Run v3 model (recommended)
+# Run v3 (recommended, 2026 regulation-aware)
 python src/predict_v3.py
 
-# Run original model
+# Run v2 (pure data-driven, no reg adjustments)
+python src/predict_v2.py
+
+# Run v1 (baseline with betting odds)
 python src/predict.py
 
-# Run tests
+# Tests
 python tests/test_model.py
 ```
 
@@ -111,22 +136,25 @@ npm install
 npm run dev
 ```
 
+## Extending to Full 2026 Season
+
+After each race, the model improves:
+
+**Race 1 (Australia):** Compare prediction vs actual result. Calibrate pole win rate, DNF rates, energy management impact.
+
+**Races 2-5 (China, Japan, Bahrain, Saudi Arabia):** Build a training dataset of 2026-era outcomes. Replace estimated parameters with learned ones.
+
+**Race 6+:** Switch from weighted ensemble to gradient boosting (XGBoost) trained on 2026 data. Add tire strategy and pit stop features from FastF1 telemetry.
+
+The model becomes more accurate each race because it replaces 2026 estimates with 2026 facts.
+
 ## Tech Stack
 
 **Model:** Python, NumPy, FastF1, Pandas
 
 **Dashboard:** React, Recharts, Vite
 
-**Data:** F1 live timing API (via FastF1), official session results, historical race data (1996-2025)
-
-## Model Versions
-
-| Version | Features | Simulations | Betting Data | Accuracy Driver |
-|---------|----------|-------------|--------------|-----------------|
-| v1 | 10 | 50,000 | 20% weight | Position-based |
-| v3 | 13 | 100,000 | None | Time-gap-based |
-
-v3 produces sharper predictions because it uses time gaps instead of position ranks and derives all signal from F1 data.
+**Data:** F1 live timing API (via FastF1), official session results
 
 ## License
 
