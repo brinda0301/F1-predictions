@@ -6,16 +6,20 @@ The whole thing runs in one command: `streamlit run app.py`
 
 ## Does it work?
 
-So far, yes.
+Two races in. 1/2 winners correct. 5/6 podium slots correct.
 
 | Race | Predicted | Win% | Actual | Result |
 |------|-----------|------|--------|--------|
 | R1 Australia | George Russell | 59.1% | George Russell won by 2.9s | Correct |
-| R2 China | Lewis Hamilton | 36.2% | Race is today (Mar 15) | TBD |
+| R2 China | Lewis Hamilton | 55.25% | Kimi Antonelli won by 5.5s | Wrong winner, 3/3 podium match |
 
-Russell won from pole, led a Mercedes 1-2, and the model had him as a clear favorite. 2 out of 3 podium finishers were in the top 5 predictions. 27% of the grid DNS/DNF'd, which matched the elevated failure rates I'd built in for new engine partnerships.
+Australia: model predicted Russell, Russell won. 2/3 podium correct. 27% of the grid DNS/DNF'd, matching the elevated failure rates I'd built in for new engine partnerships.
 
-Not everything was right. Verstappen went from P20 to P6 and the model gave him 0.56%. Ferrari's VSC strategy mistake cost Leclerc the win, and the model had no way to simulate that. Both of those gaps led to the v5 update.
+China: model predicted Hamilton from P3. Antonelli won from pole. The predicted top 3 (Hamilton, Russell, Antonelli) and the actual top 3 (Antonelli, Russell, Hamilton) were the same three drivers, different order. Leclerc P4 predicted, P4 actual. 7 of 22 cars DNS/DNF'd (32%). Both McLarens DNS. Both Aston Martins out. Verstappen DNF again. The failure rate predictions held up for the second straight race.
+
+The model overweighted track history (Hamilton's 6 Shanghai wins) and underweighted grid position (pole won both races). After submitting the China result, the self-calibration adjusted: quali_pace and grid_win_rate weights went up, track_history went down.
+
+Not everything was right. Verstappen went from P20 to P6 in Australia and the model gave him 0.56%. Ferrari's VSC strategy mistake cost Leclerc the win in Melbourne, and the model had no way to simulate that. Both gaps led to the v5 update before China.
 
 ## What the model actually does
 
@@ -92,13 +96,33 @@ The learning rate starts at 0.05 and decays by 30% after each race. This means e
 
 It's gradient descent on 18 feature weights, with one training example per race. Not a lot of data, but enough to correct the worst hand-tuning mistakes.
 
-## China GP prediction
+## China GP result (Round 2, March 15)
 
-Hamilton to win from P3 with 36.2% probability.
+**Predicted: Lewis Hamilton (55.25%) from P3. Actual: Kimi Antonelli won from pole by 5.5s.**
 
-He has 6 wins at Shanghai. Ferrari's start advantage was confirmed in Australia. He finished P3 in the sprint. 18 seasons of experience in rain and changing conditions. Shanghai's 1km+ back straight suits aero-efficient cars, but Hamilton's track history overrides the circuit mismatch.
+| # | Predicted | Win% | Actual |
+|---|-----------|------|--------|
+| 1 | Lewis Hamilton | 55.25% | P3 |
+| 2 | George Russell | 18.04% | P2 |
+| 3 | Kimi Antonelli | 8.99% | P1 (WINNER) |
+| 4 | Charles Leclerc | 8.5% | P4 |
+| 5 | Lando Norris | 2.33% | DNS |
 
-Russell (P2, 18.6%) and Antonelli (P1, 11.9%) are the main threats. Antonelli is on pole but only has one season of F1 experience and got a 10-second penalty in the sprint. The model penalizes him for that.
+Wrong winner. But the three predicted podium drivers (Hamilton, Russell, Antonelli) were the actual top 3. Different order. Leclerc P4 was an exact match. 7 of 22 cars DNS/DNF'd (32%).
+
+Why the model was wrong: Hamilton's 6 Shanghai wins inflated his score. Track history compounded through multiple features. Antonelli drove a clean race from pole and the car advantage was decisive. Pole has now won both 2026 races.
+
+What the self-calibration changed: increased quali_pace and grid_win_rate weights, decreased track_history. The model now trusts qualifying pace more and historical wins less.
+
+## Early 2026 pattern (2 races in)
+
+Mercedes has won both races. Pole has won both races. Energy management is the separator. The grid's DNF/DNS rate is extreme: 27% in Australia, 32% in China. Both McLarens DNS'd in China. Verstappen has DNF'd or started from the back in both races.
+
+The model's 2026 regulation adjustments (elevated DNF rates, energy uncertainty, active aero overtaking) have been validated. The main correction needed: qualifying pace and grid position matter more than track history in this new era. The calibration is already making that adjustment.
+
+## What's next
+
+Race 3: Japan GP, Suzuka, March 29. After qualifying data is available, I'll create `races/03_japan/data.py` and run the prediction. After 3 races, I plan to add an XGBoost model alongside Monte Carlo. Two models, two approaches, compared side by side.
 
 ## Project structure
 
@@ -109,7 +133,7 @@ F1-predictions/
     config.json         Weights + accuracy history
     races/
         01_australia/   Data + prediction + result
-        02_china/       Data + prediction
+        02_china/       Data + prediction + result
     archive/            Old model versions (v1-v3)
     .streamlit/         Theme config
     requirements.txt
