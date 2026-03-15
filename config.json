@@ -2,17 +2,19 @@
   "model_version": "v4_self_calibrating",
   "last_calibrated_after_round": 1,
   "weights": {
-    "quali_pace": 0.2206,
-    "grid_win_rate": 0.071,
-    "race_pace": 0.1332,
-    "practice_pace": 0.0829,
-    "sprint_score": 0.1011,
-    "teammate_gap": 0.073,
-    "adaptability": 0.0655,
-    "start_score": 0.0597,
-    "reliability": 0.071,
-    "energy_score": 0.0704,
-    "track_history": 0.0517
+    "quali_pace": 0.1981,
+    "race_pace": 0.1181,
+    "sprint_score": 0.0795,
+    "practice_pace": 0.0669,
+    "energy_score": 0.1162,
+    "fuel_quality": 0.0588,
+    "dirty_air": 0.0398,
+    "grid_win_rate": 0.0596,
+    "teammate_gap": 0.0623,
+    "reliability": 0.0596,
+    "adaptability": 0.0445,
+    "start_score": 0.0528,
+    "track_history": 0.0436
   },
   "regulation_params": {
     "pole_win_rate": 0.45,
@@ -25,7 +27,7 @@
       "round": 1,
       "race": "Australia",
       "predicted_winner": "George Russell",
-      "predicted_win_pct": 32.61,
+      "predicted_win_pct": 25.34,
       "actual_winner": "George Russell",
       "correct": true,
       "podium_predicted": [
@@ -39,7 +41,7 @@
         "Charles Leclerc"
       ],
       "podium_overlap": 2,
-      "mean_position_error": 0.18
+      "mean_position_error": 4.44
     }
   ]
 }
