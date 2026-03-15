@@ -1,25 +1,25 @@
 {
   "model_version": "v5_full_factor",
-  "last_calibrated_after_round": 1,
+  "last_calibrated_after_round": 2,
   "weights": {
-    "quali_pace": 0.1376,
-    "grid_win_rate": 0.0497,
-    "race_pace": 0.098,
-    "practice_pace": 0.0476,
-    "sprint_score": 0.0695,
-    "teammate_gap": 0.0424,
-    "adaptability": 0.0383,
-    "start_score": 0.0458,
-    "reliability": 0.0497,
-    "energy_score": 0.0961,
-    "tyre_management": 0.0763,
-    "pit_execution": 0.0367,
-    "tyre_compound_fit": 0.0293,
-    "fuel_quality": 0.0389,
-    "dirty_air": 0.0299,
-    "circuit_fit": 0.0395,
-    "track_temp": 0.0274,
-    "track_history": 0.0473
+    "quali_pace": 0.136,
+    "grid_win_rate": 0.0493,
+    "race_pace": 0.0967,
+    "practice_pace": 0.0464,
+    "sprint_score": 0.0696,
+    "teammate_gap": 0.0416,
+    "adaptability": 0.0418,
+    "start_score": 0.0488,
+    "reliability": 0.0493,
+    "energy_score": 0.0951,
+    "tyre_management": 0.0754,
+    "pit_execution": 0.0364,
+    "tyre_compound_fit": 0.0288,
+    "fuel_quality": 0.0385,
+    "dirty_air": 0.0297,
+    "circuit_fit": 0.0391,
+    "track_temp": 0.0269,
+    "track_history": 0.0507
   },
   "regulation_params": {
     "pole_win_rate": 0.45,
@@ -47,6 +47,26 @@
         "Charles Leclerc"
       ],
       "podium_overlap": 2,
+      "mean_position_error": 0.18
+    },
+    {
+      "round": 2,
+      "race": "China",
+      "predicted_winner": "Lewis Hamilton",
+      "predicted_win_pct": 55.25,
+      "actual_winner": "Kimi Antonelli",
+      "correct": false,
+      "podium_predicted": [
+        "Lewis Hamilton",
+        "George Russell",
+        "Kimi Antonelli"
+      ],
+      "podium_actual": [
+        "Kimi Antonelli",
+        "George Russell",
+        "Lewis Hamilton"
+      ],
+      "podium_overlap": 3,
       "mean_position_error": 0.18
     }
   ]
