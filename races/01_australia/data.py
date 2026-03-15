@@ -105,3 +105,28 @@ CIRCUIT_HISTORY = {
     "Fernando Alonso": {"wins": 1, "podiums": 3},
     "George Russell": {"wins": 0, "podiums": 1},
 }
+
+# -- new v2 fields --
+
+CIRCUIT = {
+    "type": "balanced",         # mix of fast straights and slow chicanes
+    "pit_loss_seconds": 21,     # time lost entering/exiting pits
+    "laps": 58,
+    "sc_probability": 0.75,     # Albert Park hands out safety cars
+}
+
+TYRE_COMPOUNDS = {
+    "hard": "C3",
+    "medium": "C4",
+    "soft": "C5",
+    "hardness": 0.3,            # softer range (0=softest, 1=hardest)
+    "one_stop_probability": 0.60,
+    "graining_risk": 0.4,       # front tyre graining was present
+}
+
+WEATHER = {
+    "track_temp_c": 35,
+    "air_temp_c": 22,
+    "rain_probability": 0.05,   # dry race
+    "wind_kph": 15,
+}

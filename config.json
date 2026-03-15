@@ -1,33 +1,39 @@
 {
-  "model_version": "v4_self_calibrating",
+  "model_version": "v5_full_factor",
   "last_calibrated_after_round": 1,
   "weights": {
-    "quali_pace": 0.1981,
-    "race_pace": 0.1181,
-    "sprint_score": 0.0795,
-    "practice_pace": 0.0669,
-    "energy_score": 0.1162,
-    "fuel_quality": 0.0588,
-    "dirty_air": 0.0398,
-    "grid_win_rate": 0.0596,
-    "teammate_gap": 0.0623,
-    "reliability": 0.0596,
-    "adaptability": 0.0445,
-    "start_score": 0.0528,
-    "track_history": 0.0436
+    "quali_pace": 0.1376,
+    "grid_win_rate": 0.0497,
+    "race_pace": 0.098,
+    "practice_pace": 0.0476,
+    "sprint_score": 0.0695,
+    "teammate_gap": 0.0424,
+    "adaptability": 0.0383,
+    "start_score": 0.0458,
+    "reliability": 0.0497,
+    "energy_score": 0.0961,
+    "tyre_management": 0.0763,
+    "pit_execution": 0.0367,
+    "tyre_compound_fit": 0.0293,
+    "fuel_quality": 0.0389,
+    "dirty_air": 0.0299,
+    "circuit_fit": 0.0395,
+    "track_temp": 0.0274,
+    "track_history": 0.0473
   },
   "regulation_params": {
     "pole_win_rate": 0.45,
     "overtake_factor": 1.4,
-    "energy_uncertainty": 0.04,
-    "softmax_temperature": 0.14
+    "energy_uncertainty": 0.06,
+    "softmax_temperature": 0.11,
+    "dirty_air_retention": 0.9
   },
   "accuracy_history": [
     {
       "round": 1,
       "race": "Australia",
       "predicted_winner": "George Russell",
-      "predicted_win_pct": 25.34,
+      "predicted_win_pct": 32.61,
       "actual_winner": "George Russell",
       "correct": true,
       "podium_predicted": [
@@ -41,7 +47,7 @@
         "Charles Leclerc"
       ],
       "podium_overlap": 2,
-      "mean_position_error": 4.44
+      "mean_position_error": 0.18
     }
   ]
 }
