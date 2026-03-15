@@ -1,189 +1,144 @@
 # F1 2026 Race Winner Prediction
 
-ML model to predict Formula 1 race winners. Built for the 2026 Australian Grand Prix. 100% data-driven. Zero betting market data. 2026 regulation-aware.
+I built a model that predicts who wins each Formula 1 race. It uses qualifying data, practice times, sprint results, tyre strategy, and 100,000 Monte Carlo simulations. After each race, it compares what it predicted vs what happened and adjusts its own weights. It started with hand-tuned guesses for Race 1. By mid-season it should be running on learned data.
 
-## Result: MODEL WAS CORRECT
+The whole thing runs in one command: `streamlit run app.py`
 
-**Predicted: George Russell (Mercedes) wins with 59.1% probability.**
+## Does it work?
 
-**Actual: George Russell (Mercedes) won by 2.9 seconds.**
+So far, yes.
 
-Russell won the race from pole, leading a Mercedes 1-2 with Antonelli in P2 and Leclerc P3. The model correctly predicted the winner, the podium composition (Russell, Antonelli, Leclerc were all top 5 in our predictions), and the Mercedes dominance.
+| Race | Predicted | Win% | Actual | Result |
+|------|-----------|------|--------|--------|
+| R1 Australia | George Russell | 59.1% | George Russell won by 2.9s | Correct |
+| R2 China | Lewis Hamilton | 36.2% | Race is today (Mar 15) | TBD |
 
-## Prediction vs Reality
+Russell won from pole, led a Mercedes 1-2, and the model had him as a clear favorite. 2 out of 3 podium finishers were in the top 5 predictions. 27% of the grid DNS/DNF'd, which matched the elevated failure rates I'd built in for new engine partnerships.
 
-| # | Predicted | Win% | Actual Result | Grid | Correct? |
-|---|-----------|------|---------------|------|----------|
-| 1 | George Russell | 59.1% | P1 WINNER | P1 | YES |
-| 2 | Lewis Hamilton | 7.57% | P4 | P7 | Top 5 correct |
-| 3 | Charles Leclerc | 6.63% | P3 PODIUM | P4 | YES (podium) |
-| 4 | Oscar Piastri | 4.76% | DNS (crash to grid) | P5 | DNF captured by model |
-| 5 | Kimi Antonelli | 4.20% | P2 PODIUM | P2 | YES (podium) |
-| 6 | Lando Norris | 2.35% | P5 | P6 | Close |
-| 7 | Isack Hadjar | 2.30% | DNF (mechanical) | P3 | DNF risk 13.87% |
-| 8 | Max Verstappen | 0.56% | P6 (from P20) | P20 | Underestimated recovery |
+Not everything was right. Verstappen went from P20 to P6 and the model gave him 0.56%. Ferrari's VSC strategy mistake cost Leclerc the win, and the model had no way to simulate that. Both of those gaps led to the v5 update.
 
-## Accuracy Analysis
+## What the model actually does
 
-**What the model got right:**
+For each race, it goes through three steps.
 
-Winner prediction correct. Russell won from pole. The 59.1% probability was well-calibrated: he won but faced real challenges from Leclerc in the early laps.
+**Features.** It builds 18 numbers for every driver on the grid. Each one is between 0 and 1. They cover car speed (qualifying gaps, practice times, race pace), driver skill (teammate delta, sprint result, experience), race-day factors (start performance, reliability, energy management), tyre and pit strategy (tyre degradation handling, pit crew speed, compound suitability), and 2026-specific stuff (sustainable fuel quality, dirty air following, circuit type match, track temperature sensitivity).
 
-Mercedes 1-2 predicted. Both Russell and Antonelli were in our top 5. Mercedes dominance from qualifying carried into the race.
+**Scoring.** Multiply each feature by its weight, add them up, run softmax to get a win probability. The temperature parameter (currently 0.08) controls how confident the model is. Lower = more decisive. Higher = more spread out.
 
-Podium composition correct. Russell, Antonelli, and Leclerc were all predicted top 5. All three finished on the podium.
+**Simulation.** Run the race 100,000 times. Each simulation randomly throws in events that happen in real F1: safety cars, rain, mechanical failures, bad pit stops, tyre degradation, energy management mistakes, lap 1 crashes, driver errors. After 100K runs, count how many times each driver won. That's the win percentage.
 
-DNF predictions validated. Hadjar retired with a mechanical failure (our model gave him 13.87% DNF risk). Bottas retired (we gave Cadillac 26% DNF risk). Hulkenberg DNS with technical issues (Audi had 21.49% DNF risk). The new engine partnership reliability concerns were justified.
+## Why these 18 features
 
-Piastri DNS. He crashed on his sighting lap. Our model couldn't predict that specific event, but the Monte Carlo simulation's "driver error" probability (4%) and lap 1 chaos (35%) captured this type of randomness.
+I started with 10 for Australia. After the race exposed gaps (no tyre strategy, no pit execution, no circuit matching), I added 8 more for China.
 
-**What the model got wrong:**
+| Feature | Weight | Why it matters |
+|---------|--------|---------------|
+| quali_pace | 14% | Gap to pole in seconds. The single strongest predictor of race pace. |
+| race_pace | 10% | Team deficit from practice long runs. Tells you who has the faster car over a stint. |
+| energy_score | 10% | The defining challenge of 2026. 350kW MGU-K means half the car's power is electric. Mismanage the battery and you're a sitting duck on straights. FIA is already reviewing the rules because it dominates too much. |
+| tyre_management | 8% | How well the team preserves tyre life. Research shows tyre degradation is more predictive than qualifying for race outcomes. |
+| sprint_score | 7% | Sprint finishing position. It's a real mini-race with real data, not a simulation. |
+| grid_win_rate | 5% | Historical win rate from each grid slot. Adjusted down for 2026 because active aero makes overtaking easier. |
+| practice_pace | 5% | FP1 times. Noisy signal (teams run different programs) but still data. |
+| reliability | 5% | Did they finish last race? New regs = new failure modes. If something broke in Australia, it might not be fixed. |
+| start_score | 4% | 2026 start procedure is completely new. Ferrari nailed it in testing. Leclerc jumped P4 to P1 at the start in Melbourne. |
+| teammate_gap | 4% | Qualifying delta to teammate. Isolates driver skill from car performance. |
+| circuit_fit | 4% | Some cars suit some tracks. Mercedes is strong on high-speed circuits. Ferrari is better on street tracks. |
+| fuel_quality | 4% | Sustainable fuel is mandatory for the first time. Performance varies by supplier. Mercedes/Petronas is ahead. Cadillac is behind. |
+| pit_execution | 4% | Pit crew speed. McLaren stops in 2.2s. Cadillac takes 3.1s. That gap costs positions. |
+| track_history | 4% | Hamilton has 6 wins at Shanghai. That's not a coincidence. |
+| adaptability | 3% | How many regulation changes the driver has survived. Hamilton has been through 2009, 2014, 2017, 2022, and now 2026. |
+| dirty_air | 3% | Following another car used to cost 30% downforce. In 2026 it's only 10%. Huge change. |
+| tyre_compound_fit | 3% | Harder compounds favor teams with better tyre management. Softer compounds favor raw speed. |
+| track_temp | 3% | Hot track = more tyre degradation = teams with good tyre skills gain. Cool track = less deg = speed wins. |
 
-Verstappen recovery underestimated. We gave him 0.56% win probability from P20. He finished P6. The model didn't fully account for how effectively a 4-time champion recovers through the field, especially when retirements ahead clear the way. Active aero and overtake mode helped him gain positions.
+## 2026 regulations baked into the model
 
-Ferrari strategy error not modeled. Ferrari didn't pit under the VSC, which cost Leclerc the win. Our model doesn't simulate pit strategy decisions. This is the biggest gap.
+2026 is the biggest rule change in F1 history. The model accounts for all of it.
 
-Hamilton undervalued. We predicted 7.57% win probability. He finished P4, close to the podium (0.6s behind Leclerc). Ferrari's race pace was stronger than our FP2 estimates suggested. Hamilton said the car "felt good" and he had "great pace."
+Active aero replaced DRS. Every driver gets low-drag mode on straights now, not just cars within 1 second. I dropped the pole win rate from 60% to 45% because overtaking is way easier. Australia confirmed this: Leclerc led from P4 for multiple laps.
 
-**Key learning: 2026 regulation adjustments were directionally correct.**
+The power unit is completely different. MGU-H is gone. MGU-K went from 120kW to 350kW. Power is now split roughly 50/50 between petrol and electric. Verstappen called it "Formula E on steroids." Russell said his battery had "nothing in the tank" at the Melbourne start. I model this as energy noise (0.06 per driver per sim) with extra variance for new teams.
 
-We reduced the pole win rate from 60% to 45% for active aero. Russell won from pole, but Leclerc actually led the race for multiple laps before strategy separated them. Overtaking happened. The old 60% rate would have been too high, validating the adjustment.
+Cars are 76kg lighter and smaller. Wheelbase down 200mm, width down 100mm. The "Nimble Car Concept." Lighter cars are more sensitive to setup and fuel load, so I added weight variance to the simulation.
 
-We modeled energy management uncertainty. Russell said on the grid his "battery level had nothing in the tank" and he made a bad start. Ferrari's energy deployment at the start was superior, as predicted (start procedure advantage feature). Energy management was indeed a factor.
+Sustainable fuel is mandatory. Different suppliers have different performance. I gave each team a fuel quality score based on pre-season testing reports.
 
-We raised DNF rates for new engines. 6 cars did not finish or did not start (Piastri DNS, Hulkenberg DNS, Hadjar DNF, Bottas DNF, both Aston Martins not classified). That's 27% of the grid. Our elevated DNF rates were accurate.
+Tyres are smaller (front -25mm, rear -30mm). Different degradation profiles. I added tyre management as an 8% weighted feature and simulate degradation penalties in every Monte Carlo run.
 
-## How It Works
+New engine partnerships (Cadillac, Audi, Aston Martin with Honda, Red Bull with Ford) have higher DNF rates. 27% of the grid DNS/DNF'd in Australia. The model's elevated failure rates were right.
 
-**1. Data Collection.** Qualifying lap times, practice session times (FP1/FP2/FP3), pre-season testing data, driver career stats. All from 2026 sessions.
+## What changed after Australia
 
-**2. Feature Engineering.** 10 normalized features per driver. Uses qualifying time gaps in seconds (not position rank).
+Australia was the first race of the 2026 era. The model (v3) got the winner right but missed several things.
 
-**3. Model Scoring.** Weighted ensemble with softmax normalization. Temperature calibrated to 2026-adjusted pole win rate (45%).
+Ferrari didn't pit under the VSC. That cost Leclerc the win. The model had no pit strategy simulation. Fixed in v5: every Monte Carlo run now simulates 1-stop vs 2-stop decisions, pit crew speed differences, and bad pit stop probability.
 
-**4. Monte Carlo Simulation.** 100,000 race simulations with 2026-specific events: safety cars (55%), virtual safety cars (25%), rain (15%), lap 1 incidents (35%), energy management uncertainty, higher DNF rates for new engine partnerships.
+Verstappen recovered from P20 to P6. The model gave him 0.56% win probability. Active aero helped him gain 14 positions. The overtake boost was too conservative. Adjusted in v5.
 
-## Features (v3, zero betting data)
+Tyre degradation determined strategy. The model treated it as random noise. Now tyre_management is an 8% weighted feature and the simulation applies team-specific degradation penalties every run.
 
-| Feature | Weight | Source |
-|---------|--------|--------|
-| Qualifying pace (time gap to pole) | 26% | 2026 qualifying session |
-| FP2 race pace | 16% | 2026 practice high-fuel runs |
-| Teammate qualifying gap | 8% | 2026 intra-team delta |
-| Energy management readiness | 8% | Pre-season testing laps completed |
-| Grid-position win rate (2026-adjusted) | 8% | Historical, adjusted for active aero |
-| Qualifying extraction | 7% | Quali vs practice delta |
-| Reliability | 7% | Weekend crash/mechanical events |
-| Adaptability | 6% | Regulation-change survival count |
-| Practice trend | 6% | FP1 to FP3 time improvement |
-| Start procedure | 5% | 2026 pre-season reports |
+Track temperature affected tyre behavior. Not modeled before. Now track_temp is a feature and the simulation adjusts variance based on surface temperature.
 
-## 2026 Regulation Adjustments
+Feature count went from 13 to 18. Softmax temperature went from 0.14 to 0.08 (more decisive predictions).
 
-| Regulation Change | Model Adjustment | Race Validation |
-|-------------------|-----------------|-----------------|
-| Active aero replaces DRS | Pole win rate 60% to 45% | Leclerc led from P4 early. Overtaking happened. |
-| Overtake Mode | Pursuing drivers get energy boost | Verstappen gained 14 positions from P20 |
-| 300% more battery power | Energy management uncertainty | Russell had battery issues at start |
-| New engine partnerships | Higher DNF rates (8-12%) | 6 cars DNS/DNF (27% of grid) |
-| 22-car grid | Lap 1 incidents raised to 35% | Piastri crashed before race start |
-| New start procedure | Ferrari advantage modeled | Leclerc jumped from P4 to P1 at start |
+## How self-calibration works
 
-## Model Evolution
+After each race, I enter the top 10 finishing order. The model compares predicted rankings vs actual positions.
 
-| Version | File | Features | Sims | Betting Data | Russell Win% |
-|---------|------|----------|------|-------------|-------------|
-| v1 | predict.py | 10 | 50K | 20% weight | 62.0% |
-| v2 | predictv2.py | 13 | 100K | None | 78.06% |
-| v3 | predictv3.py | 10 | 100K | None | 59.1% |
-| Actual | Race result | - | - | - | WON |
+If it ranked a driver too high (predicted P2, finished P8), it looks at which features scored high for that driver and decreases their weights. If it ranked someone too low, it increases the weights.
 
-v1 used betting odds as 20% of the model. v2 removed betting data and used time gaps. v3 adjusted for 2026 active aero, energy management, and new engine reliability. All three correctly predicted Russell as the winner.
+The learning rate starts at 0.05 and decays by 30% after each race. This means early races cause bigger weight shifts. By Race 5, adjustments are smaller and more precise. By Race 10, the weights are stable and data-driven.
 
-## Project Structure
+It's gradient descent on 18 feature weights, with one training example per race. Not a lot of data, but enough to correct the worst hand-tuning mistakes.
+
+## China GP prediction
+
+Hamilton to win from P3 with 36.2% probability.
+
+He has 6 wins at Shanghai. Ferrari's start advantage was confirmed in Australia. He finished P3 in the sprint. 18 seasons of experience in rain and changing conditions. Shanghai's 1km+ back straight suits aero-efficient cars, but Hamilton's track history overrides the circuit mismatch.
+
+Russell (P2, 18.6%) and Antonelli (P1, 11.9%) are the main threats. Antonelli is on pole but only has one season of F1 experience and got a 10-second penalty in the sprint. The model penalizes him for that.
+
+## Project structure
 
 ```
-f1-aus-gp-predictor/
-├── src/
-│   ├── predictv3.py          v3: 2026 regulation-aware (CURRENT)
-│   ├── predictv2.py          v2: pure data-driven
-│   ├── predict.py            v1: baseline
-│   ├── data_loader.py        Static race data
-│   ├── fastf1_loader.py      FastF1 API integration
-│   ├── features.py           Base feature engineering
-│   ├── features_enhanced.py  Enhanced features with FastF1
-│   ├── model.py              Scoring functions
-│   └── monte_carlo.py        Simulation engine
-├── dashboard/
-│   └── src/App.jsx           Comparison dashboard (4 tabs)
-├── data/
-│   ├── predictions_v4.json   v3 output
-│   ├── predictions_v3.json   v2 output
-│   └── predictions.json      v1 output
-├── tests/
-│   └── test_model.py         8 unit tests
-├── docs/
-│   └── methodology.md
-├── requirements.txt
-└── README.md
+F1-predictions/
+    app.py              Dashboard (one page, dark theme)
+    engine.py           Prediction engine (18 features, 100K sims)
+    config.json         Weights + accuracy history
+    races/
+        01_australia/   Data + prediction + result
+        02_china/       Data + prediction
+    archive/            Old model versions (v1-v3)
+    .streamlit/         Theme config
+    requirements.txt
 ```
 
-## Quick Start
+## Running it
 
-```bash
+```
 git clone https://github.com/brinda0301/F1-predictions.git
 cd F1-predictions
-
 python -m venv venv
-
-# Windows
-.\venv\Scripts\Activate.ps1
-
-# Mac/Linux
-source venv/bin/activate
-
+.\venv\Scripts\Activate.ps1       # Windows
 pip install -r requirements.txt
-
-# Run v3 (recommended, 2026 regulation-aware)
-python src/predictv3.py
-
-# Run v2 (pure data-driven)
-python src/predictv2.py
-
-# Run v1 (baseline)
-python src/predict.py
-
-# Tests
-python tests/test_model.py
+streamlit run app.py
 ```
 
-### Comparison Dashboard
+Or from the terminal:
 
-```bash
-cd dashboard
-npm install
-npm run dev
+```
+python engine.py 02_china
 ```
 
-4 tabs: Compare (3 models side by side), Evolution (line chart of win% changes), Changelog (every change tagged), Model Cards (technical specs).
+## Adding a new race
 
-## Extending to Full 2026 Season
+Create `races/03_japan/data.py` with qualifying grid, practice times, sprint results, tyre compounds, circuit info, and weather. Run the prediction. After the race, submit the result. Model calibrates itself.
 
-The Australian GP result gives us the first calibration point.
+## Tech stack
 
-**Immediate fixes for Race 2 (China):** Increase Verstappen recovery factor. Add pit strategy simulation. Reduce Ferrari start advantage if other teams adapt.
-
-**By Race 5:** Build a training dataset of 2026 outcomes. Replace estimated parameters with learned ones. Switch from weighted ensemble to gradient boosting (XGBoost).
-
-**By Race 10:** Add tire degradation curves from FastF1 telemetry. Model energy deployment lap-by-lap. The model gets smarter each race.
-
-## Tech Stack
-
-**Model:** Python, NumPy, FastF1, Pandas
-
-**Dashboard:** React, Recharts, Vite
-
-**Data:** F1 live timing API, official session results, historical data (track layout only)
+Python, NumPy, Streamlit, Plotly, FastF1
 
 ## License
 
