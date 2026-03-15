@@ -1,18 +1,18 @@
 {
-  "model_version": "v4_calibrated",
+  "model_version": "v4_self_calibrating",
   "last_calibrated_after_round": 1,
   "weights": {
-    "quali_pace": 0.2340,
-    "grid_win_rate": 0.0745,
-    "race_pace": 0.1383,
-    "practice_pace": 0.0851,
-    "sprint_score": 0.1064,
-    "teammate_gap": 0.0745,
-    "adaptability": 0.0532,
-    "start_score": 0.0532,
-    "reliability": 0.0745,
-    "energy_score": 0.0745,
-    "track_history": 0.0426
+    "quali_pace": 0.2206,
+    "grid_win_rate": 0.071,
+    "race_pace": 0.1332,
+    "practice_pace": 0.0829,
+    "sprint_score": 0.1011,
+    "teammate_gap": 0.073,
+    "adaptability": 0.0655,
+    "start_score": 0.0597,
+    "reliability": 0.071,
+    "energy_score": 0.0704,
+    "track_history": 0.0517
   },
   "regulation_params": {
     "pole_win_rate": 0.45,
@@ -20,28 +20,26 @@
     "energy_uncertainty": 0.04,
     "softmax_temperature": 0.14
   },
-  "calendar_2026": [
-    {"round": 1, "name": "Australian Grand Prix", "circuit": "Albert Park", "date": "2026-03-08", "format": "standard"},
-    {"round": 2, "name": "Chinese Grand Prix", "circuit": "Shanghai International", "date": "2026-03-15", "format": "sprint"},
-    {"round": 3, "name": "Japanese Grand Prix", "circuit": "Suzuka", "date": "2026-03-29", "format": "standard"},
-    {"round": 4, "name": "Bahrain Grand Prix", "circuit": "Bahrain International", "date": "2026-04-05", "format": "standard"},
-    {"round": 5, "name": "Saudi Arabian Grand Prix", "circuit": "Jeddah Corniche", "date": "2026-04-19", "format": "standard"},
-    {"round": 6, "name": "Miami Grand Prix", "circuit": "Miami International", "date": "2026-05-03", "format": "sprint"},
-    {"round": 7, "name": "Canadian Grand Prix", "circuit": "Circuit Gilles Villeneuve", "date": "2026-05-24", "format": "standard"},
-    {"round": 8, "name": "Monaco Grand Prix", "circuit": "Circuit de Monaco", "date": "2026-05-31", "format": "standard"}
-  ],
   "accuracy_history": [
     {
       "round": 1,
-      "race": "Australian Grand Prix",
+      "race": "Australia",
       "predicted_winner": "George Russell",
-      "predicted_win_pct": 59.1,
+      "predicted_win_pct": 32.61,
       "actual_winner": "George Russell",
       "correct": true,
-      "podium_predicted": ["George Russell", "Lewis Hamilton", "Charles Leclerc"],
-      "podium_actual": ["George Russell", "Kimi Antonelli", "Charles Leclerc"],
+      "podium_predicted": [
+        "George Russell",
+        "Lewis Hamilton",
+        "Charles Leclerc"
+      ],
+      "podium_actual": [
+        "George Russell",
+        "Kimi Antonelli",
+        "Charles Leclerc"
+      ],
       "podium_overlap": 2,
-      "mean_position_error": null
+      "mean_position_error": 0.18
     }
   ]
 }

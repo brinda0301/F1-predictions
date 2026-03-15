@@ -5,6 +5,12 @@ Race: Sunday March 15, 2026 | 56 laps | 305km
 
 Sprint weekend format: FP1 only (no FP2/FP3)
 Sprint race result used as additional race pace data.
+
+Data sources:
+- Qualifying: formula1.com, the-race.com (March 14 2026)
+- FP1: formula1.com, crash.net (March 13 2026)
+- Sprint race: racingnews365.com (March 14 2026)
+- Sprint qualifying: racingnews365.com (March 13 2026)
 """
 
 RACE_INFO = {
@@ -19,6 +25,7 @@ RACE_INFO = {
     "longest_straight_km": 1.2,
 }
 
+# Qualifying results (March 14 2026)
 GRID = [
     {"pos": 1,  "driver": "Kimi Antonelli",      "team": "Mercedes",      "q_time": 92.064},
     {"pos": 2,  "driver": "George Russell",       "team": "Mercedes",      "q_time": 92.286},
@@ -44,6 +51,7 @@ GRID = [
     {"pos": 22, "driver": "Sergio Perez",         "team": "Cadillac",      "q_time": 96.830},
 ]
 
+# FP1 results (only practice session, sprint weekend)
 FP1_TIMES = {
     "George Russell":      92.741,
     "Kimi Antonelli":      92.861,
@@ -66,34 +74,36 @@ FP1_TIMES = {
     "Sergio Perez":        95.000,
     "Valtteri Bottas":     95.200,
     "Lance Stroll":        95.500,
-    "Arvid Lindblad":      None,
+    "Arvid Lindblad":      None,  # Retired early, smoke from car
 }
 
+# Sprint race result (used as race pace indicator)
 SPRINT_RESULT = [
     {"pos": 1,  "driver": "George Russell",   "team": "Mercedes"},
     {"pos": 2,  "driver": "Charles Leclerc",  "team": "Ferrari"},
     {"pos": 3,  "driver": "Lewis Hamilton",   "team": "Ferrari"},
     {"pos": 4,  "driver": "Lando Norris",     "team": "McLaren"},
-    {"pos": 5,  "driver": "Kimi Antonelli",   "team": "Mercedes"},
+    {"pos": 5,  "driver": "Kimi Antonelli",   "team": "Mercedes"},  # Had 10s penalty, recovered
     {"pos": 6,  "driver": "Oscar Piastri",    "team": "McLaren"},
     {"pos": 7,  "driver": "Pierre Gasly",     "team": "Alpine"},
     {"pos": 8,  "driver": "Oliver Bearman",   "team": "Haas"},
-    {"pos": 9,  "driver": "Max Verstappen",   "team": "Red Bull"},
+    {"pos": 9,  "driver": "Max Verstappen",   "team": "Red Bull"},  # Fell back then recovered
     {"pos": 10, "driver": "Isack Hadjar",     "team": "Red Bull"},
 ]
 
+# Driver experience (carried from Australia, updated with R1 results)
 DRIVER_EXPERIENCE = {
     "George Russell":     {"f1_seasons": 7,  "career_poles": 5,  "r1_finish": 1},
     "Kimi Antonelli":     {"f1_seasons": 1,  "career_poles": 1,  "r1_finish": 2},
-    "Isack Hadjar":       {"f1_seasons": 0,  "career_poles": 0,  "r1_finish": None},
+    "Isack Hadjar":       {"f1_seasons": 0,  "career_poles": 0,  "r1_finish": None},  # DNF
     "Charles Leclerc":    {"f1_seasons": 7,  "career_poles": 26, "r1_finish": 3},
-    "Oscar Piastri":      {"f1_seasons": 3,  "career_poles": 2,  "r1_finish": None},
+    "Oscar Piastri":      {"f1_seasons": 3,  "career_poles": 2,  "r1_finish": None},  # DNS
     "Lando Norris":       {"f1_seasons": 6,  "career_poles": 8,  "r1_finish": 5},
     "Lewis Hamilton":     {"f1_seasons": 18, "career_poles": 104, "r1_finish": 4},
     "Liam Lawson":        {"f1_seasons": 1,  "career_poles": 0,  "r1_finish": 13},
     "Arvid Lindblad":     {"f1_seasons": 0,  "career_poles": 0,  "r1_finish": 8},
     "Gabriel Bortoleto":  {"f1_seasons": 0,  "career_poles": 0,  "r1_finish": 9},
-    "Nico Hulkenberg":    {"f1_seasons": 14, "career_poles": 1,  "r1_finish": None},
+    "Nico Hulkenberg":    {"f1_seasons": 14, "career_poles": 1,  "r1_finish": None},  # DNS
     "Oliver Bearman":     {"f1_seasons": 1,  "career_poles": 0,  "r1_finish": 7},
     "Esteban Ocon":       {"f1_seasons": 8,  "career_poles": 0,  "r1_finish": 11},
     "Pierre Gasly":       {"f1_seasons": 8,  "career_poles": 0,  "r1_finish": 10},
@@ -101,12 +111,15 @@ DRIVER_EXPERIENCE = {
     "Franco Colapinto":   {"f1_seasons": 1,  "career_poles": 0,  "r1_finish": 14},
     "Fernando Alonso":    {"f1_seasons": 22, "career_poles": 22, "r1_finish": 16},
     "Sergio Perez":       {"f1_seasons": 14, "career_poles": 3,  "r1_finish": 15},
-    "Valtteri Bottas":    {"f1_seasons": 13, "career_poles": 20, "r1_finish": None},
+    "Valtteri Bottas":    {"f1_seasons": 13, "career_poles": 20, "r1_finish": None},  # DNF
     "Max Verstappen":     {"f1_seasons": 10, "career_poles": 40, "r1_finish": 6},
-    "Carlos Sainz":       {"f1_seasons": 10, "career_poles": 6,  "r1_finish": None},
-    "Lance Stroll":       {"f1_seasons": 8,  "career_poles": 1,  "r1_finish": None},
+    "Carlos Sainz":       {"f1_seasons": 10, "career_poles": 6,  "r1_finish": None},  # Not classified
+    "Lance Stroll":       {"f1_seasons": 8,  "career_poles": 1,  "r1_finish": None},  # Not classified
 }
 
+# Shanghai-specific data
+# 1.2km back straight = active aero matters a LOT here
+# Hamilton has 6 wins at Shanghai (most of any driver)
 CIRCUIT_HISTORY = {
     "Lewis Hamilton":     {"wins": 6, "podiums": 8},
     "Fernando Alonso":    {"wins": 2, "podiums": 3},
@@ -117,6 +130,7 @@ CIRCUIT_HISTORY = {
     "George Russell":     {"wins": 0, "podiums": 1},
 }
 
+# Team pace from FP1 + Sprint (gap to fastest in seconds)
 TEAM_PACE_DEFICIT = {
     "Mercedes":      0.000,
     "Ferrari":       0.300,
@@ -131,6 +145,8 @@ TEAM_PACE_DEFICIT = {
     "Cadillac":      2.500,
 }
 
+# Start procedure performance from R1 (Australia)
+# Ferrari gained at the start, Mercedes lost
 START_PROCEDURE = {
     "Ferrari":       0.4,
     "Mercedes":     -0.1,
@@ -145,6 +161,7 @@ START_PROCEDURE = {
     "Cadillac":     -0.3,
 }
 
+# Energy readiness (updated after R1)
 ENERGY_READINESS = {
     "Mercedes":      0.95,
     "Ferrari":       0.90,

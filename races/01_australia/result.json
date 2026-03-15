@@ -1,54 +1,136 @@
 {
-  "race": "2026 Australian Grand Prix",
-  "circuit": "Albert Park, Melbourne",
-  "date": "2026-03-08",
-  "laps": 58,
-  "winner_margin": "2.9s",
-  "safety_cars": 0,
-  "virtual_safety_cars": 2,
-  "rain": false,
   "result": [
-    {"pos": 1,  "driver": "George Russell",     "team": "Mercedes",      "grid": 1,  "status": "Finished", "gap": "WINNER"},
-    {"pos": 2,  "driver": "Kimi Antonelli",      "team": "Mercedes",      "grid": 2,  "status": "Finished", "gap": "+2.9s"},
-    {"pos": 3,  "driver": "Charles Leclerc",     "team": "Ferrari",       "grid": 4,  "status": "Finished", "gap": "+4.5s"},
-    {"pos": 4,  "driver": "Lewis Hamilton",      "team": "Ferrari",       "grid": 7,  "status": "Finished", "gap": "+5.1s"},
-    {"pos": 5,  "driver": "Lando Norris",        "team": "McLaren",       "grid": 6,  "status": "Finished", "gap": "+55s"},
-    {"pos": 6,  "driver": "Max Verstappen",      "team": "Red Bull",      "grid": 20, "status": "Finished", "gap": "+56s"},
-    {"pos": 7,  "driver": "Oliver Bearman",      "team": "Haas",          "grid": 12, "status": "Finished", "gap": ""},
-    {"pos": 8,  "driver": "Arvid Lindblad",      "team": "Racing Bulls",  "grid": 9,  "status": "Finished", "gap": ""},
-    {"pos": 9,  "driver": "Gabriel Bortoleto",   "team": "Audi",          "grid": 10, "status": "Finished", "gap": ""},
-    {"pos": 10, "driver": "Pierre Gasly",        "team": "Alpine",        "grid": 14, "status": "Finished", "gap": ""},
-    {"pos": 11, "driver": "Esteban Ocon",        "team": "Haas",          "grid": 13, "status": "Finished", "gap": ""},
-    {"pos": 12, "driver": "Alex Albon",          "team": "Williams",      "grid": 15, "status": "Finished", "gap": ""},
-    {"pos": 13, "driver": "Liam Lawson",         "team": "Racing Bulls",  "grid": 8,  "status": "Finished", "gap": ""},
-    {"pos": 14, "driver": "Franco Colapinto",    "team": "Alpine",        "grid": 16, "status": "Finished", "gap": ""},
-    {"pos": 15, "driver": "Sergio Perez",        "team": "Cadillac",      "grid": 18, "status": "Finished", "gap": ""},
-    {"pos": 16, "driver": "Fernando Alonso",     "team": "Aston Martin",  "grid": 17, "status": "Finished", "gap": ""},
-    {"pos": null, "driver": "Carlos Sainz",      "team": "Williams",      "grid": 21, "status": "Not classified", "gap": ""},
-    {"pos": null, "driver": "Lance Stroll",      "team": "Aston Martin",  "grid": 22, "status": "Not classified", "gap": ""},
-    {"pos": null, "driver": "Isack Hadjar",      "team": "Red Bull",      "grid": 3,  "status": "DNF - Mechanical", "gap": ""},
-    {"pos": null, "driver": "Valtteri Bottas",   "team": "Cadillac",      "grid": 19, "status": "DNF - Retired", "gap": ""},
-    {"pos": null, "driver": "Oscar Piastri",     "team": "McLaren",       "grid": 5,  "status": "DNS - Crash to grid", "gap": ""},
-    {"pos": null, "driver": "Nico Hulkenberg",   "team": "Audi",          "grid": 11, "status": "DNS - Technical", "gap": ""}
-  ],
-  "key_events": [
-    "Leclerc jumped from P4 to P1 at start (Ferrari start procedure advantage confirmed)",
-    "Russell and Leclerc swapped positions in opening laps",
-    "VSC on lap 11 for Hadjar mechanical retirement",
-    "Mercedes pitted both cars under VSC. Ferrari stayed out.",
-    "VSC again for Bottas retirement",
-    "Ferrari pitted Leclerc lap 25, Hamilton lap 28 in normal racing",
-    "Mercedes one-stop strategy worked. Russell and Antonelli stayed ahead.",
-    "Piastri crashed on sighting lap, did not start",
-    "Hulkenberg DNS due to technical issue on grid",
-    "Verstappen recovered from P20 to P6"
-  ],
-  "model_validation": {
-    "winner_correct": true,
-    "podium_2_of_3_correct": true,
-    "top_5_4_of_5_in_predicted_top_8": true,
-    "dnf_predictions_validated": "Hadjar DNF (13.87% predicted), Bottas DNF (26.6% predicted), Hulkenberg DNS (21.49% predicted)",
-    "biggest_miss": "Verstappen P6 from P20 (model gave 0.56% win, underestimated recovery ability)",
-    "strategy_gap": "Model does not simulate pit stop strategy. Ferrari's VSC decision cost them the win."
-  }
+    {
+      "pos": 1,
+      "driver": "George Russell",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 2,
+      "driver": "Kimi Antonelli",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 3,
+      "driver": "Charles Leclerc",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 4,
+      "driver": "Lewis Hamilton",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 5,
+      "driver": "Lando Norris",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 6,
+      "driver": "Sergio Perez",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 7,
+      "driver": "Valtteri Bottas",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 8,
+      "driver": "Oscar Piastri",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 9,
+      "driver": "Nico Hulkenberg",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 10,
+      "driver": "Isack Hadjar",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 11,
+      "driver": "Gabriel Bortoleto",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 12,
+      "driver": "Fernando Alonso",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 13,
+      "driver": "Max Verstappen",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 14,
+      "driver": "Liam Lawson",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 15,
+      "driver": "Esteban Ocon",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 16,
+      "driver": "Pierre Gasly",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 17,
+      "driver": "Alex Albon",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 18,
+      "driver": "Arvid Lindblad",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 19,
+      "driver": "Oliver Bearman",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 20,
+      "driver": "Carlos Sainz",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 21,
+      "driver": "Franco Colapinto",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 22,
+      "driver": "Lance Stroll",
+      "team": "",
+      "status": "Finished"
+    }
+  ]
 }
