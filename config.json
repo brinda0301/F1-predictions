@@ -2,52 +2,44 @@
   "model_version": "v5_full_factor",
   "last_calibrated_after_round": 2,
   "weights": {
-    "quali_pace": 0.136,
-    "grid_win_rate": 0.0493,
-    "race_pace": 0.0967,
-    "practice_pace": 0.0464,
-    "sprint_score": 0.0696,
-    "teammate_gap": 0.0416,
-    "adaptability": 0.0418,
-    "start_score": 0.0488,
-    "reliability": 0.0493,
-    "energy_score": 0.0951,
-    "tyre_management": 0.0754,
-    "pit_execution": 0.0364,
-    "tyre_compound_fit": 0.0288,
-    "fuel_quality": 0.0385,
-    "dirty_air": 0.0297,
-    "circuit_fit": 0.0391,
-    "track_temp": 0.0269,
-    "track_history": 0.0507
+    "quali_pace": 0.1905,
+    "race_pace": 0.1048,
+    "energy_score": 0.0952,
+    "sprint_score": 0.0762,
+    "tyre_management": 0.0667,
+    "grid_win_rate": 0.0667,
+    "practice_pace": 0.0571,
+    "reliability": 0.0476,
+    "fuel_quality": 0.0476,
+    "adaptability": 0.0381,
+    "start_score": 0.0381,
+    "teammate_gap": 0.0381,
+    "pit_execution": 0.0286,
+    "circuit_fit": 0.0286,
+    "track_temp": 0.019,
+    "dirty_air": 0.019,
+    "tyre_compound_fit": 0.019,
+    "track_history": 0.019
   },
   "regulation_params": {
     "pole_win_rate": 0.45,
     "overtake_factor": 1.4,
     "energy_uncertainty": 0.06,
     "softmax_temperature": 0.08,
-    "dirty_air_retention": 0.9
+    "dirty_air_retention": 0.90
   },
   "accuracy_history": [
     {
       "round": 1,
       "race": "Australia",
       "predicted_winner": "George Russell",
-      "predicted_win_pct": 32.61,
+      "predicted_win_pct": 59.1,
       "actual_winner": "George Russell",
       "correct": true,
-      "podium_predicted": [
-        "George Russell",
-        "Lewis Hamilton",
-        "Charles Leclerc"
-      ],
-      "podium_actual": [
-        "George Russell",
-        "Kimi Antonelli",
-        "Charles Leclerc"
-      ],
+      "podium_predicted": ["George Russell", "Lewis Hamilton", "Charles Leclerc"],
+      "podium_actual": ["George Russell", "Kimi Antonelli", "Charles Leclerc"],
       "podium_overlap": 2,
-      "mean_position_error": 0.18
+      "mean_position_error": 3.5
     },
     {
       "round": 2,
@@ -56,18 +48,10 @@
       "predicted_win_pct": 55.25,
       "actual_winner": "Kimi Antonelli",
       "correct": false,
-      "podium_predicted": [
-        "Lewis Hamilton",
-        "George Russell",
-        "Kimi Antonelli"
-      ],
-      "podium_actual": [
-        "Kimi Antonelli",
-        "George Russell",
-        "Lewis Hamilton"
-      ],
+      "podium_predicted": ["Lewis Hamilton", "George Russell", "Kimi Antonelli"],
+      "podium_actual": ["Kimi Antonelli", "George Russell", "Lewis Hamilton"],
       "podium_overlap": 3,
-      "mean_position_error": 0.18
+      "mean_position_error": 4.5
     }
   ]
 }
