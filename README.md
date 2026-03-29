@@ -6,13 +6,13 @@ The whole thing runs in one command: `streamlit run app.py`
 
 ## Does it work?
 
-Two races in. 1/2 winners correct. 5/6 podium slots correct.
+Two races in. 2/3 winners correct. 6/9 podium slots correct.
 
 | Race | Predicted | Win% | Actual | Result |
 |------|-----------|------|--------|--------|
 | R1 Australia | George Russell | 59.1% | George Russell won by 2.9s | Correct |
 | R2 China | Lewis Hamilton | 55.25% | Kimi Antonelli won by 5.5s | Wrong winner, 3/3 podium match |
-| R3 Japan | Kimi Antonelli | 40.11% | Race tomorrow (Mar 29) | TBD |
+| R3 Japan | Kimi Antonelli | 40.11% | Kimi Antonelli won by 13.7s | Correct |
 
 Australia: model predicted Russell, Russell won. 2/3 podium correct. 27% of the grid DNS/DNF'd, matching the elevated failure rates I'd built in for new engine partnerships.
 
@@ -115,33 +115,35 @@ Why the model was wrong: Hamilton's 6 Shanghai wins inflated his score. Track hi
 
 What the self-calibration changed: increased quali_pace and grid_win_rate weights, decreased track_history. The model now trusts qualifying pace more and historical wins less.
 
-## Early 2026 pattern (2 races in)
+## Japan GP Result (Round 3, March 29)
 
-Mercedes has won both races. Pole has won both races. Energy management is the separator. The grid's DNF/DNS rate is extreme: 27% in Australia, 32% in China. Both McLarens DNS'd in China. Verstappen has DNF'd or started from the back in all three qualifying sessions so far. He called the Red Bull "undrivable" at Suzuka.
+**Predicted: Kimi Antonelli (40.11%) from pole. Actual: Antonelli won by 13.7 seconds. CORRECT.**
 
-The model's 2026 regulation adjustments (elevated DNF rates, energy uncertainty, active aero overtaking) have been validated. The main correction after China: qualifying pace and grid position matter more than track history in this new era. track_history weight dropped from 4% to 2%. quali_pace is now the heaviest weight at 20%.
+| # | Predicted | Win% | Actual |
+|---|-----------|------|--------|
+| 1 | Kimi Antonelli | 40.11% | P1 (WINNER) |
+| 2 | George Russell | 16.01% | P4 |
+| 3 | Lewis Hamilton | 14.14% | P6 |
+| 4 | Charles Leclerc | 8.79% | P3 |
+| 5 | Lando Norris | 3.40% | P5 |
+
+Antonelli dropped to P6 at the start. Piastri took the lead. On lap 22, Bearman crashed (50G, no fractures). Safety car came out. Antonelli hadn't pitted yet. He came in under the safety car, emerged P1, and won by 13.7 seconds.
+
+The Monte Carlo simulation captures exactly this scenario. In thousands of the 100,000 simulations, the polesitter loses positions early, a safety car resets the field, and the fastest car wins on pure pace. That's why Antonelli still had 40% even though losing the start was a real possibility.
+
+Hamilton finished P6 from P6. The model had him at 14.14% (predicted P3). Still overrated. The calibration after this race will decrease his feature scores further. Leclerc P3 actual vs P4 predicted. Piastri P2 was the surprise, not predicted in the top 5.
+
+Stroll retired (water pressure). Bearman crashed out (50G). Albon had 6 pit stops. The grid's reliability issues continue.
+
+## Early 2026 pattern (3 races in)
+
+Mercedes has won all three races. Pole has won all three races. Antonelli has won the last two back-to-back, taking the championship lead at 19 years old. Energy management and qualifying pace are the two features that matter most. The model's 2026 regulation adjustments continue to be validated: elevated DNF rates, energy uncertainty, and active aero overtaking are all real factors.
+
+The Hamilton overrating problem is clear: track history and experience features push him too high when he qualifies poorly. The calibration is correcting this race by race.
 
 ## What's next
 
-Race 3: Japan GP, Suzuka, March 29. After qualifying data is available, I'll create `races/03_japan/data.py` and run the prediction. After 3 races, I plan to add an XGBoost model alongside Monte Carlo. Two models, two approaches, compared side by side.
-
-## Japan GP Prediction (Round 3, March 29)
-
-**Predicted: Kimi Antonelli (40.11%) from pole.**
-
-| # | Driver | Team | Grid | Win% |
-|---|--------|------|------|------|
-| 1 | Kimi Antonelli | Mercedes | P1 | 40.11% |
-| 2 | George Russell | Mercedes | P2 | 16.01% |
-| 3 | Lewis Hamilton | Ferrari | P6 | 14.14% |
-| 4 | Charles Leclerc | Ferrari | P4 | 8.79% |
-| 5 | Lando Norris | McLaren | P5 | 3.40% |
-
-Antonelli on pole for the third straight race. The model learned from China: track_history weight dropped from 5.3% to 2%. Qualifying pace is now the dominant feature at 20%. Pole has won both 2026 races. Mercedes has won both races. Verstappen out in Q2 again, called his car "undrivable."
-
-Key Suzuka factors: hardest tyre compounds of the season (C1/C2/C3, first C1 debut). Newly resurfaced across almost the entire lap. Cool conditions (19C air, 25C track). One-stop Medium to Hard likely. Tyre management matters here because Suzuka is one of the most demanding circuits for tyre wear.
-
-McLaren showed pace in qualifying (Piastri P3, +0.354s). If anyone breaks the Mercedes streak, it's them. But 0.354s is a big gap at Suzuka.
+Race 4: Miami GP, May 1. The model now has 3 races of calibration data (~50 training rows). Time to add XGBoost alongside Monte Carlo. Two models, side by side, agreeing or disagreeing.
 
 ## Project structure
 
@@ -153,7 +155,7 @@ F1-predictions/
     races/
         01_australia/   Data + prediction + result
         02_china/       Data + prediction + result
-        03_japan/       Data + prediction
+        03_japan/       Data + prediction + result
     archive/            Old model versions (v1-v3)
     .streamlit/         Theme config
     requirements.txt
