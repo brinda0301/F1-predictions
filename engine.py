@@ -1,18 +1,17 @@
 """
 F1 2026 Race Winner Prediction Engine
 
-Predicts race winners using qualifying, practice, sprint data and
-Monte Carlo simulation. Built around the 2026 FIA regulation overhaul.
+Two models in one file:
+  Monte Carlo: 100K simulations using 18 weighted features. Self-calibrates
+               feature weights after each race using gradient descent.
+  XGBoost:     trained on past race features and finishing positions. Re-trains
+               from scratch each race using all completed races as data.
 
-The model uses 17 features covering every measurable factor that
-determines race outcomes: car speed, driver skill, tyre strategy,
-pit execution, energy management, fuel quality, and more.
-
-Self-calibrates after each race using gradient descent on feature
-weights. Starts hand-tuned, becomes data-driven by mid-season.
+The two run side by side. predict() saves both outputs to prediction.json.
+The dashboard reads both and shows them as separate cards.
 
 Usage:
-    python engine.py 02_china
+    python engine.py 04_miami
     python engine.py              # runs latest race
 """
 
@@ -22,6 +21,13 @@ import sys
 import importlib
 import numpy as np
 from collections import defaultdict
+
+# XGBoost is optional. If not installed, the Monte Carlo half still works.
+try:
+    from xgboost import XGBRegressor
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RACES_DIR = os.path.join(BASE_DIR, "races")
@@ -170,12 +176,12 @@ def load_race_data(race_folder):
 
 
 # ---------------------------------------------------------------
-# feature engineering (17 features)
+# feature engineering (18 features)
 # ---------------------------------------------------------------
 
 def build_features(driver, race_data):
     """
-    17 features per driver, all normalized [0, 1].
+    18 features per driver, all normalized [0, 1].
 
     Categories:
       Car speed:    quali_pace, race_pace, practice_pace, grid_win_rate
@@ -183,6 +189,7 @@ def build_features(driver, race_data):
       Race factors: start_score, reliability, energy_score
       Tyre/pit:     tyre_management, pit_execution, tyre_compound_fit
       2026-specific: fuel_quality, dirty_air, circuit_fit, track_temp
+      History:      track_history
     """
     name = driver["driver"]
     team = driver["team"]
@@ -204,14 +211,12 @@ def build_features(driver, race_data):
     # ---- CAR SPEED ----
 
     # 1. QUALIFYING PACE
-    # time gap to pole in seconds. 0s = 1.0, 4s+ = 0.0
     if q_time and pole_time:
         quali_pace = max(0.0, 1.0 - ((q_time - pole_time) / 4.0))
     else:
         quali_pace = 0.15
 
     # 2. GRID POSITION WIN RATE
-    # adjusted for 2026 active aero (45% from pole, not 60%)
     if grid == 1:
         grid_rate = POLE_WIN_RATE
     elif grid <= 3:
@@ -224,11 +229,9 @@ def build_features(driver, race_data):
         grid_rate = max(0.001, 0.01 * (1 - (grid - 10) / 12))
 
     # 3. RACE PACE
-    # team deficit from practice long runs. 0s = 1.0, 3s = 0.0
     race_pace = max(0.0, 1.0 - (deficit / 3.0))
 
     # 4. PRACTICE PACE
-    # FP1 time vs session best
     fp1_time = fp1.get(name)
     if fp1_time is not None:
         valid = [t for t in fp1.values() if t is not None]
@@ -240,7 +243,6 @@ def build_features(driver, race_data):
     # ---- DRIVER SKILL ----
 
     # 5. SPRINT RESULT
-    # sprint finishing position. real race data, not simulation.
     sprint_score = 0.3
     for s in sprint:
         if s["driver"] == name:
@@ -248,7 +250,6 @@ def build_features(driver, race_data):
             break
 
     # 6. TEAMMATE GAP
-    # qualifying delta to teammate. isolates driver from car.
     tm_time = None
     for d in race_data["GRID"]:
         if d["team"] == team and d["driver"] != name and d["q_time"]:
@@ -262,7 +263,6 @@ def build_features(driver, race_data):
         teammate_gap = 0.2
 
     # 7. ADAPTABILITY
-    # reg change survival count. 2026 is a full reset.
     seasons = exp.get("f1_seasons", 0)
     reg_changes = sum([seasons >= 2, seasons >= 5, seasons >= 9, seasons >= 13])
     adaptability = min(1.0, reg_changes * 0.25)
@@ -270,12 +270,9 @@ def build_features(driver, race_data):
     # ---- RACE FACTORS ----
 
     # 8. START PROCEDURE
-    # 2026 launch is completely different. clutch, anti-stall,
-    # energy deployment all changed. Ferrari nailed it in testing.
     start_score = min(1.0, max(0.0, 0.5 + start_adv))
 
     # 9. RELIABILITY
-    # did they finish the last race?
     r1_finish = exp.get("r1_finish")
     if r1_finish is not None and r1_finish <= 10:
         reliability = 0.95
@@ -285,51 +282,31 @@ def build_features(driver, race_data):
         reliability = 0.50
 
     # 10. ENERGY MANAGEMENT
-    # 350kW MGU-K = half the car's power is electric.
-    # Russell's battery had "nothing in the tank" at Melbourne start.
-    # FIA reviewing rules after Australia because it dominates too much.
     energy_score = energy
 
     # ---- TYRE AND PIT STRATEGY ----
 
     # 11. TYRE MANAGEMENT
-    # how well the team preserves tyre life over long stints.
-    # this is the "hidden metric" - tyre deg is more predictive
-    # than qualifying for race outcome.
     tyre_mgmt = TYRE_MANAGEMENT.get(team, 0.5)
 
     # 12. PIT EXECUTION
-    # pit crew speed normalized. 2.0s = 1.0, 3.5s = 0.0.
-    # McLaren and Red Bull are the fastest pit crews.
     crew_time = PIT_CREW_SPEED.get(team, 2.8)
     pit_exec = max(0.0, min(1.0, (3.5 - crew_time) / 1.5))
 
     # 13. TYRE COMPOUND FIT
-    # how well the team suits the specific compounds at this race.
-    # Shanghai uses C2/C3/C4 (harder range). Teams with good tyre
-    # management on harder compounds score higher. If softer compounds
-    # are used, teams with raw speed benefit more.
-    compound_hardness = tyre_info.get("hardness", 0.5)  # 0=soft, 1=hard
-    # teams with better tyre management prefer harder compounds
+    compound_hardness = tyre_info.get("hardness", 0.5)
     tyre_fit = tyre_mgmt * compound_hardness + quali_pace * (1 - compound_hardness)
     tyre_fit = min(1.0, tyre_fit)
 
     # ---- 2026-SPECIFIC ----
 
     # 14. FUEL QUALITY
-    # sustainable fuel performance varies by supplier
     fuel = FUEL_SUPPLIERS.get(team, 0.6)
 
     # 15. DIRTY AIR HANDLING
-    # 90% downforce retention at 20m behind. some cars handle
-    # the remaining 10% loss better than others.
     dirty_air = min(1.0, DIRTY_AIR_RETENTION + deficit * 0.02)
 
     # 16. CIRCUIT FIT
-    # how well does the car suit this type of circuit?
-    # high-speed circuits favor aero-efficient cars (Mercedes, Red Bull).
-    # street circuits favor mechanical grip (Ferrari).
-    # balanced circuits are more equal.
     circuit_type = circuit.get("type", "balanced")
     aero_teams = {"Mercedes": 0.9, "Red Bull": 0.85, "McLaren": 0.8}
     mech_teams = {"Ferrari": 0.9, "Haas": 0.75, "Audi": 0.7}
@@ -338,21 +315,18 @@ def build_features(driver, race_data):
     elif circuit_type == "street":
         circuit_fit = mech_teams.get(team, 0.6)
     else:
-        circuit_fit = 0.7 + race_pace * 0.2  # balanced = pace matters most
+        circuit_fit = 0.7 + race_pace * 0.2
 
     # 17. TRACK TEMPERATURE SENSITIVITY
-    # hotter track = more tyre deg = teams with good tyre management gain.
-    # cooler track = less deg = raw speed matters more.
     track_temp = weather.get("track_temp_c", 30)
     if track_temp >= 40:
-        temp_factor = tyre_mgmt  # hot = tyre management is king
+        temp_factor = tyre_mgmt
     elif track_temp >= 30:
         temp_factor = tyre_mgmt * 0.6 + quali_pace * 0.4
     else:
-        temp_factor = tyre_mgmt * 0.3 + quali_pace * 0.7  # cool = speed wins
+        temp_factor = tyre_mgmt * 0.3 + quali_pace * 0.7
 
     # 18. TRACK HISTORY
-    # past wins and podiums at this circuit
     track = min(1.0, history.get("wins", 0) * 0.3 + history.get("podiums", 0) * 0.1)
 
     return {
@@ -377,8 +351,141 @@ def build_features(driver, race_data):
     }
 
 
+# ===============================================================
+# XGBoost block (added R4 Miami)
+# ===============================================================
+
+def build_training_data(exclude_folder):
+    """Walk past races, return X (features), y (finishing positions), feature_names.
+
+    One row per driver per completed race. Skips the target race so we never
+    train on the data we are about to predict on.
+    """
+    X_rows = []
+    y_rows = []
+    feature_names = None
+
+    for race_folder in get_race_folders():
+        if race_folder == exclude_folder:
+            continue
+        if not has_data(race_folder):
+            continue
+        result_path = os.path.join(RACES_DIR, race_folder, "result.json")
+        if not os.path.exists(result_path):
+            continue
+
+        race_data = load_race_data(race_folder)
+        with open(result_path) as f:
+            result_data = json.load(f)
+
+        actual_pos = {}
+        for r in result_data["result"]:
+            if r.get("pos") is not None:
+                actual_pos[r["driver"]] = r["pos"]
+
+        for driver in race_data["GRID"]:
+            name = driver["driver"]
+            if name not in actual_pos:
+                continue
+            feats = build_features(driver, race_data)
+            if feature_names is None:
+                feature_names = sorted(feats.keys())
+            X_rows.append([feats[k] for k in feature_names])
+            y_rows.append(actual_pos[name])
+
+    if not X_rows:
+        return np.array([]), np.array([]), []
+
+    return np.array(X_rows), np.array(y_rows), feature_names
+
+
+def xgboost_predict(race_folder):
+    """Train XGBoost on past races and predict the target race.
+
+    Returns None if xgboost isn't installed. Returns a dict with
+    available=False if there isn't enough training data yet.
+    """
+    if not XGBOOST_AVAILABLE:
+        return None
+
+    X_train, y_train, feature_names = build_training_data(race_folder)
+
+    if len(X_train) < 10:
+        return {
+            "available": False,
+            "reason": f"Only {len(X_train)} training rows. Need 10+.",
+            "trained_rows": int(len(X_train)),
+        }
+
+    # Roughly 22 drivers per race so this counts the number of races used
+    n_races = max(1, len(X_train) // 20)
+    n_estimators = min(300, 50 + n_races * 20)
+
+    # max_depth stays at 3 until the season has ~7 races logged. Shallow trees
+    # prevent overfitting on small data.
+    model = XGBRegressor(
+        n_estimators=n_estimators,
+        max_depth=3,
+        learning_rate=0.1,
+        objective="reg:squarederror",
+        random_state=42,
+        verbosity=0,
+    )
+    model.fit(X_train, y_train)
+    train_mae = float(np.mean(np.abs(model.predict(X_train) - y_train)))
+
+    # Build target features. Same feature_names order so columns line up.
+    race_data = load_race_data(race_folder)
+    target_drivers = []
+    target_teams = []
+    target_grid = []
+    X_target = []
+    for d in race_data["GRID"]:
+        feats = build_features(d, race_data)
+        target_drivers.append(d["driver"])
+        target_teams.append(d["team"])
+        target_grid.append(d["pos"])
+        X_target.append([feats[k] for k in feature_names])
+
+    X_target = np.array(X_target)
+    predicted_positions = model.predict(X_target)
+
+    # Convert positions to win probabilities. Softmax of -position.
+    # Temp 1.5 keeps the favourite below 70% even when XGBoost is confident.
+    temp = 1.5
+    scores = -predicted_positions / temp
+    scores -= scores.max()
+    exp_s = np.exp(scores)
+    probs = exp_s / exp_s.sum()
+
+    predictions = []
+    for i, drv in enumerate(target_drivers):
+        predictions.append({
+            "driver": drv,
+            "team": target_teams[i],
+            "grid_pos": target_grid[i],
+            "predicted_position": round(float(predicted_positions[i]), 2),
+            "win_prob": round(float(probs[i]), 4),
+        })
+    predictions.sort(key=lambda x: x["predicted_position"])
+
+    importance = {k: round(float(v), 4)
+                  for k, v in zip(feature_names, model.feature_importances_)}
+
+    return {
+        "available": True,
+        "trained_rows": int(len(X_train)),
+        "n_races_trained_on": int(n_races),
+        "n_estimators": n_estimators,
+        "max_depth": 3,
+        "mae": round(train_mae, 3),
+        "predictions": predictions,
+        "feature_importance": importance,
+    }
+
+
 # ---------------------------------------------------------------
-# prediction
+# prediction (Monte Carlo + XGBoost combined)
 # ---------------------------------------------------------------
 
 def predict(race_folder, config=None):
@@ -386,7 +493,8 @@ def predict(race_folder, config=None):
     1. build 18 features per driver
     2. weighted sum + softmax -> probabilities
     3. 100K Monte Carlo simulations with 2026 race events
-    4. output win/podium/DNF percentages
+    4. train XGBoost on past races, predict this race
+    5. write both outputs to prediction.json
     """
     if config is None:
         config = load_config()
@@ -407,9 +515,7 @@ def predict(race_folder, config=None):
             "raw_score": score,
         })
 
-    # softmax. temperature 0.11 gives ~35-45% to favorite.
-    # tighter than 0.14 because with 18 features the signal
-    # is stronger and we want the model to be more decisive.
+    # softmax
     scores = np.array([p["raw_score"] for p in preds])
     exp_s = np.exp((scores - scores.max()) / temp)
     probs = exp_s / exp_s.sum()
@@ -424,7 +530,6 @@ def predict(race_folder, config=None):
     n = len(drivers)
     base = np.array([p["win_prob"] for p in preds])
 
-    # tyre strategy for this circuit
     circuit = race_data["CIRCUIT"]
     tyre_info = race_data["TYRE_COMPOUNDS"]
     weather = race_data["WEATHER"]
@@ -436,81 +541,56 @@ def predict(race_folder, config=None):
     for _ in range(n_sims):
         perf = np.random.normal(base, base * 0.30 + 0.012)
 
-        # -- energy management (2026: 50/50 power split) --
         for i in range(n):
             perf[i] += np.random.normal(0, ENERGY_NOISE)
             if teams[i] in ("Cadillac", "Audi", "Aston Martin"):
                 perf[i] += np.random.normal(0, 0.03)
 
-        # -- fuel quality variance (sustainable fuel) --
         for i in range(n):
             fuel = FUEL_SUPPLIERS.get(teams[i], 0.6)
             perf[i] += np.random.normal(0, (1.0 - fuel) * 0.03)
 
-        # -- lighter car sensitivity (724kg) --
         perf += np.random.normal(0, WEIGHT_VARIANCE, n)
 
-        # -- tyre degradation --
-        # this is where tyre management actually matters.
-        # teams with poor tyre management lose more performance
-        # as the stint progresses. the effect compounds over a race.
         for i in range(n):
             tyre_skill = TYRE_MANAGEMENT.get(teams[i], 0.5)
             deg_penalty = np.random.normal(0, (1.0 - tyre_skill) * 0.04)
             perf[i] += deg_penalty
 
-        # -- pit strategy --
-        # one-stop vs two-stop. the sim randomly assigns each driver
-        # a strategy. two-stop costs time in the pits but gives
-        # fresher tyres. the tradeoff depends on pit loss time
-        # and how hard the circuit is on tyres.
         for i in range(n):
             is_one_stop = np.random.random() < one_stop_pct
             if not is_one_stop:
-                # two-stop: lose time in pits but gain from fresh tyres
-                pit_time_loss = pit_loss / 90.0 * 0.01  # normalized
+                pit_time_loss = pit_loss / 90.0 * 0.01
                 tyre_gain = TYRE_MANAGEMENT.get(teams[i], 0.5) * 0.015
                 perf[i] += tyre_gain - pit_time_loss
 
-        # -- pit stop execution --
-        # a slow pit stop costs positions. 0.3s slower = real pain.
         for i in range(n):
             crew = PIT_CREW_SPEED.get(teams[i], 2.8)
-            # chance of a bad stop (wheel gun issue, etc)
             if np.random.random() < 0.05:
                 perf[i] -= np.random.uniform(0.01, 0.04)
-            # baseline pit speed advantage
             perf[i] += (2.8 - crew) * 0.005
 
-        # -- track temperature effect --
         track_temp = weather.get("track_temp_c", 30)
         if track_temp > 35:
-            # hot track = more tyre deg = chaos
             perf += np.random.normal(0, 0.025, n)
         elif track_temp < 20:
-            # cold track = less grip = more driver skill needed
             for i in range(n):
                 seasons = race_data["DRIVER_EXPERIENCE"].get(
                     drivers[i], {}).get("f1_seasons", 0)
                 perf[i] += seasons * 0.001
 
-        # -- safety car (50%) --
         if np.random.random() < 0.50:
             leader = perf.max()
             perf = perf * 0.7 + leader * 0.3
             perf += np.random.normal(0, 0.02, n)
-            # SC creates free pit stop window
             for i in range(n):
                 if np.random.random() < 0.3:
                     tyre_boost = TYRE_MANAGEMENT.get(teams[i], 0.5) * 0.01
                     perf[i] += tyre_boost
 
-        # -- VSC (25%) --
-        # Ferrari didn't pit under VSC in Melbourne. cost them.
         if np.random.random() < 0.25:
             perf = perf * 0.9 + np.random.uniform(0, 0.08, n)
 
-        # -- rain (circuit-specific probability) --
         rain_chance = weather.get("rain_probability", 0.10)
         if np.random.random() < rain_chance:
             for i in range(n):
@@ -519,14 +599,12 @@ def predict(race_folder, config=None):
                 perf[i] += seasons * 0.003
             perf += np.random.normal(0, 0.05, n)
 
-        # -- lap 1 incidents (30%) --
         if np.random.random() < 0.30:
             victims = np.random.choice([1, 2], p=[0.6, 0.4])
             for _ in range(victims):
                 v = np.random.randint(2, min(14, n))
                 perf[v] *= np.random.uniform(0.15, 0.55)
 
-        # -- active aero overtaking --
         for i in range(n):
             gp = preds[i]["grid_pos"]
             if gp > 5:
@@ -535,26 +613,21 @@ def predict(race_folder, config=None):
                 recovery *= DIRTY_AIR_RETENTION
                 perf[i] += recovery
 
-        # -- overtake mode (within 1s = extra power) --
         for i in range(1, n):
             if np.random.random() < 0.15:
                 perf[i] += 0.025
 
-        # -- mechanical DNFs --
         for i in range(n):
             rate = DNF_RATES.get(teams[i], 0.07)
             if np.random.random() < rate:
                 perf[i] = -1
 
-        # -- driver error (3%) --
         for i in range(n):
             if np.random.random() < 0.03:
                 perf[i] *= np.random.uniform(0.2, 0.6)
 
-        # -- strategy variance (undercut, overcut, calls) --
         perf += np.random.normal(0, 0.012, n)
 
-        # tally
         ranking = np.argsort(-perf)
         finishers = [drivers[r] for r in ranking if perf[r] > 0]
         if finishers:
@@ -583,11 +656,23 @@ def predict(race_folder, config=None):
         })
     results.sort(key=lambda x: x["win_pct"], reverse=True)
 
+    # --- XGBoost (added R4) ---
+    xgb_result = xgboost_predict(race_folder)
+
+    # Models agree if both pick the same winner
+    models_agree = None
+    if xgb_result and xgb_result.get("available") and results:
+        mc_winner = results[0]["driver"]
+        xgb_winner = xgb_result["predictions"][0]["driver"]
+        models_agree = (mc_winner == xgb_winner)
+
     output = {
         "race": race_data["RACE_INFO"],
         "simulations": n_sims,
         "weights_used": weights,
         "predictions": results,
+        "xgboost": xgb_result,
+        "models_agree": models_agree,
     }
     pred_path = os.path.join(RACES_DIR, race_folder, "prediction.json")
     with open(pred_path, "w") as f:
@@ -597,7 +682,7 @@ def predict(race_folder, config=None):
 
 
 # ---------------------------------------------------------------
-# self-calibration (gradient descent on feature weights)
+# self-calibration (gradient descent on Monte Carlo feature weights)
 # ---------------------------------------------------------------
 
 def calibrate(race_round):
@@ -605,6 +690,9 @@ def calibrate(race_round):
     Compare predicted ranking vs actual result.
     Nudge weights: overestimated driver -> decrease strong feature weights.
     Learning rate decays each race so early races cause bigger shifts.
+
+    XGBoost is not calibrated. It re-trains from scratch each race using
+    the latest result.json files as data.
     """
     config = load_config()
     weights = config["weights"]
@@ -678,6 +766,15 @@ def calibrate(race_round):
         if ap:
             position_errors.append(abs(i + 1 - ap))
 
+    # Track XGBoost performance too
+    xgb_winner_correct = None
+    xgb_podium_overlap = None
+    if pred_data.get("xgboost") and pred_data["xgboost"].get("available"):
+        xgb_winner = pred_data["xgboost"]["predictions"][0]["driver"]
+        xgb_winner_correct = (xgb_winner == actual_winner)
+        xgb_podium = [p["driver"] for p in pred_data["xgboost"]["predictions"][:3]]
+        xgb_podium_overlap = len(set(xgb_podium) & set(actual_podium))
+
     entry = {
         "round": race_round,
         "race": race_folder.split("_", 1)[1].replace("_", " ").title(),
@@ -689,6 +786,8 @@ def calibrate(race_round):
         "podium_actual": actual_podium,
         "podium_overlap": len(set(pred_podium) & set(actual_podium)),
         "mean_position_error": round(np.mean(position_errors), 2) if position_errors else None,
+        "xgb_winner_correct": xgb_winner_correct,
+        "xgb_podium_overlap": xgb_podium_overlap,
     }
 
     history = config.get("accuracy_history", [])
@@ -736,7 +835,22 @@ if __name__ == "__main__":
     print(f"Running prediction for: {folder}")
     out = predict(folder)
     top = out["predictions"][:3]
-    print(f"\nPredicted winner: {top[0]['driver']} ({top[0]['win_pct']}%)")
-    print(f"P2: {top[1]['driver']} ({top[1]['win_pct']}%)")
-    print(f"P3: {top[2]['driver']} ({top[2]['win_pct']}%)")
+    print(f"\nMonte Carlo")
+    print(f"  P1: {top[0]['driver']} ({top[0]['win_pct']}%)")
+    print(f"  P2: {top[1]['driver']} ({top[1]['win_pct']}%)")
+    print(f"  P3: {top[2]['driver']} ({top[2]['win_pct']}%)")
+
+    if out.get("xgboost") and out["xgboost"].get("available"):
+        xgb_top = out["xgboost"]["predictions"][:3]
+        print(f"\nXGBoost (trained on {out['xgboost']['trained_rows']} rows, MAE {out['xgboost']['mae']})")
+        print(f"  P1: {xgb_top[0]['driver']} (pos {xgb_top[0]['predicted_position']}, win {xgb_top[0]['win_prob']*100:.1f}%)")
+        print(f"  P2: {xgb_top[1]['driver']} (pos {xgb_top[1]['predicted_position']})")
+        print(f"  P3: {xgb_top[2]['driver']} (pos {xgb_top[2]['predicted_position']})")
+        print(f"\nModels agree on winner: {out['models_agree']}")
+    elif out.get("xgboost"):
+        print(f"\nXGBoost: {out['xgboost'].get('reason', 'not available')}")
+    else:
+        print("\nXGBoost not installed. Run: pip install xgboost")
+
     print(f"\nSimulations: {out['simulations']:,}")
+    
