@@ -1,191 +1,147 @@
-# F1 2026 Race Winner Prediction
+# F1 2026 Race Predictor
 
-I built a model that predicts who wins each Formula 1 race. It uses qualifying data, practice times, sprint results, tyre strategy, and 100,000 Monte Carlo simulations. After each race, it compares what it predicted vs what happened and adjusts its own weights. It started with hand-tuned guesses for Race 1. By mid-season it should be running on learned data.
+Self-calibrating ML model that predicts F1 race winners using qualifying, practice, sprint, tyre, circuit, and weather data. Built around the 2026 FIA regulation overhaul.
 
-The whole thing runs in one command: `streamlit run app.py`
+## What It Does
 
-## Does it work?
+Predicts race outcomes using two models that run side by side:
 
-Two races in. 2/3 winners correct. 6/9 podium slots correct.
+- **Monte Carlo**: 100,000 simulations using 18 weighted features. Self-calibrates feature weights after each race using gradient descent.
+- **XGBoost**: trained on past race features and finishing positions. Re-trains from scratch each race using all completed races as data.
 
-| Race | Predicted | Win% | Actual | Result |
-|------|-----------|------|--------|--------|
-| R1 Australia | George Russell | 59.1% | George Russell won by 2.9s | Correct |
-| R2 China | Lewis Hamilton | 55.25% | Kimi Antonelli won by 5.5s | Wrong winner, 3/3 podium match |
-| R3 Japan | Kimi Antonelli | 40.11% | Kimi Antonelli won by 13.7s | Correct |
+One Streamlit dashboard. One command. Dual model comparison with agreement banner, podium cards, win probability charts, DNF risk, and feature importance.
 
-Australia: model predicted Russell, Russell won. 2/3 podium correct. 27% of the grid DNS/DNF'd, matching the elevated failure rates I'd built in for new engine partnerships.
+## Race Results
 
-China: model predicted Hamilton from P3. Antonelli won from pole. The predicted top 3 (Hamilton, Russell, Antonelli) and the actual top 3 (Antonelli, Russell, Hamilton) were the same three drivers, different order. Leclerc P4 predicted, P4 actual. 7 of 22 cars DNS/DNF'd (32%). Both McLarens DNS. Both Aston Martins out. Verstappen DNF again. The failure rate predictions held up for the second straight race.
+| Round | Race | Predicted Winner | Actual Winner | Correct | Podium Hits |
+| :---: | --- | --- | --- | :---: | :---: |
+| 1 | Australian GP | Russell (59.1%) | Russell | ✅ | 2/3 |
+| 2 | Chinese GP | Hamilton (55.25%) | Antonelli | ❌ | 3/3 |
+| 3 | Japanese GP | Antonelli (40.11%) | Antonelli | ✅ | 1/3 |
+| 4 | Miami GP | Antonelli (19.2%) | Antonelli | ✅ | 2/3 |
 
-The model overweighted track history (Hamilton's 6 Shanghai wins) and underweighted grid position (pole won both races). After submitting the China result, the self-calibration adjusted: quali_pace and grid_win_rate weights went up, track_history went down.
+**Season after 4 races**: 3/4 winners correct (75%). 8/12 podium drivers hit (67%).
 
-Not everything was right. Verstappen went from P20 to P6 in Australia and the model gave him 0.56%. Ferrari's VSC strategy mistake cost Leclerc the win in Melbourne, and the model had no way to simulate that. Both gaps led to the v5 update before China.
+**2026 trends**: pole-to-win 4/4. Mercedes wins 4/4.
 
-## What the model actually does
+## XGBoost Added at Miami GP
 
-For each race, it goes through three steps.
+Starting Round 4, the engine runs XGBoost alongside Monte Carlo. XGBoost trains on past race features and finishing positions, with shallow trees (max_depth 3) and n_estimators that scale with race count.
 
-**Features.** It builds 18 numbers for every driver on the grid. Each one is between 0 and 1. They cover car speed (qualifying gaps, practice times, race pace), driver skill (teammate delta, sprint result, experience), race-day factors (start performance, reliability, energy management), tyre and pit strategy (tyre degradation handling, pit crew speed, compound suitability), and 2026-specific stuff (sustainable fuel quality, dirty air following, circuit type match, track temperature sensitivity).
+Miami GP debut:
+- Trained on 66 rows from R1 to R3
+- MAE: 0.29 positions
+- Predicted: Norris (predicted finish 3.11)
+- Actual: Antonelli won
+- XGBoost debut record: 0/1
 
-**Scoring.** Multiply each feature by its weight, add them up, run softmax to get a win probability. The temperature parameter (currently 0.08) controls how confident the model is. Lower = more decisive. Higher = more spread out.
+The disagreement between models is the point. Monte Carlo trusts the grid. XGBoost weights what's worked in past data. With 3 races of training, XGBoost over-fits sprint score and tyre compound fit. By Round 7 with 150+ training rows, the comparison sharpens.
 
-**Simulation.** Run the race 100,000 times. Each simulation randomly throws in events that happen in real F1: safety cars, rain, mechanical failures, bad pit stops, tyre degradation, energy management mistakes, lap 1 crashes, driver errors. After 100K runs, count how many times each driver won. That's the win percentage.
+Inspired by [Mariana Antaya](https://www.linkedin.com/in/mar-antaya/) who runs XGBoost for her F1 predictions.
 
-## Why these 18 features
+## 18 Features (Current Weights After R4 Calibration)
 
-I started with 10 for Australia. After the race exposed gaps (no tyre strategy, no pit execution, no circuit matching), I added 8 more for China.
+| Feature | Weight | Category |
+| --- | :---: | --- |
+| quali_pace | 19.0% | Car speed |
+| race_pace | 10.4% | Car speed |
+| energy_score | 9.5% | 2026 reg-specific |
+| sprint_score | 7.6% | Driver skill |
+| tyre_management | 6.7% | Tyre/pit |
+| grid_win_rate | 6.7% | Car speed |
+| practice_pace | 5.7% | Car speed |
+| reliability | 5.0% | Race factor |
+| fuel_quality | 4.8% | 2026 reg-specific |
+| adaptability | 4.1% | Driver skill |
+| start_score | 3.8% | Race factor |
+| teammate_gap | 3.4% | Driver skill |
+| pit_execution | 2.9% | Tyre/pit |
+| circuit_fit | 2.9% | 2026 reg-specific |
+| track_history | 2.2% | History |
+| track_temp | 1.9% | 2026 reg-specific |
+| dirty_air | 1.9% | 2026 reg-specific |
+| tyre_compound_fit | 1.9% | Tyre/pit |
 
-| Feature | Weight | Why it matters |
-|---------|--------|---------------|
-| quali_pace | 14% | Gap to pole in seconds. The single strongest predictor of race pace. |
-| race_pace | 10% | Team deficit from practice long runs. Tells you who has the faster car over a stint. |
-| energy_score | 10% | The defining challenge of 2026. 350kW MGU-K means half the car's power is electric. Mismanage the battery and you're a sitting duck on straights. FIA is already reviewing the rules because it dominates too much. |
-| tyre_management | 8% | How well the team preserves tyre life. Research shows tyre degradation is more predictive than qualifying for race outcomes. |
-| sprint_score | 7% | Sprint finishing position. It's a real mini-race with real data, not a simulation. |
-| grid_win_rate | 5% | Historical win rate from each grid slot. Adjusted down for 2026 because active aero makes overtaking easier. |
-| practice_pace | 5% | FP1 times. Noisy signal (teams run different programs) but still data. |
-| reliability | 5% | Did they finish last race? New regs = new failure modes. If something broke in Australia, it might not be fixed. |
-| start_score | 4% | 2026 start procedure is completely new. Ferrari nailed it in testing. Leclerc jumped P4 to P1 at the start in Melbourne. |
-| teammate_gap | 4% | Qualifying delta to teammate. Isolates driver skill from car performance. |
-| circuit_fit | 4% | Some cars suit some tracks. Mercedes is strong on high-speed circuits. Ferrari is better on street tracks. |
-| fuel_quality | 4% | Sustainable fuel is mandatory for the first time. Performance varies by supplier. Mercedes/Petronas is ahead. Cadillac is behind. |
-| pit_execution | 4% | Pit crew speed. McLaren stops in 2.2s. Cadillac takes 3.1s. That gap costs positions. |
-| track_history | 4% | Hamilton has 6 wins at Shanghai. That's not a coincidence. |
-| adaptability | 3% | How many regulation changes the driver has survived. Hamilton has been through 2009, 2014, 2017, 2022, and now 2026. |
-| dirty_air | 3% | Following another car used to cost 30% downforce. In 2026 it's only 10%. Huge change. |
-| tyre_compound_fit | 3% | Harder compounds favor teams with better tyre management. Softer compounds favor raw speed. |
-| track_temp | 3% | Hot track = more tyre degradation = teams with good tyre skills gain. Cool track = less deg = speed wins. |
+Weights adjust after each race based on prediction error. Learning rate decays each round so early races cause bigger shifts.
 
-## 2026 regulations baked into the model
+## 2026 FIA Regulation Constants
 
-2026 is the biggest rule change in F1 history. The model accounts for all of it.
+| Constant | Value | What Changed |
+| --- | :---: | --- |
+| POLE_WIN_RATE | 0.45 | Active aero replaced DRS |
+| DIRTY_AIR_RETENTION | 0.90 | Cars keep 90% downforce when following (was 70%) |
+| OVERTAKE_BOOST | 1.4 | Overtake Mode replaces DRS |
+| ENERGY_NOISE | 0.06 | 350kW MGU-K, 50/50 power split |
+| WEIGHT_VARIANCE | 0.015 | Cars 76kg lighter (724kg) |
 
-Active aero replaced DRS. Every driver gets low-drag mode on straights now, not just cars within 1 second. I dropped the pole win rate from 60% to 45% because overtaking is way easier. Australia confirmed this: Leclerc led from P4 for multiple laps.
+Plus per-team constants for fuel suppliers (sustainable fuel mandatory), DNF rates, pit crew speeds, and tyre management.
 
-The power unit is completely different. MGU-H is gone. MGU-K went from 120kW to 350kW. Power is now split roughly 50/50 between petrol and electric. Verstappen called it "Formula E on steroids." Russell said his battery had "nothing in the tank" at the Melbourne start. I model this as energy noise (0.06 per driver per sim) with extra variance for new teams.
+## Setup
 
-Cars are 76kg lighter and smaller. Wheelbase down 200mm, width down 100mm. The "Nimble Car Concept." Lighter cars are more sensitive to setup and fuel load, so I added weight variance to the simulation.
+Requires Python 3.12, Windows or Linux.
 
-Sustainable fuel is mandatory. Different suppliers have different performance. I gave each team a fuel quality score based on pre-season testing reports.
-
-Tyres are smaller (front -25mm, rear -30mm). Different degradation profiles. I added tyre management as an 8% weighted feature and simulate degradation penalties in every Monte Carlo run.
-
-New engine partnerships (Cadillac, Audi, Aston Martin with Honda, Red Bull with Ford) have higher DNF rates. 27% of the grid DNS/DNF'd in Australia. The model's elevated failure rates were right.
-
-## What changed after Australia
-
-Australia was the first race of the 2026 era. The model (v3) got the winner right but missed several things.
-
-Ferrari didn't pit under the VSC. That cost Leclerc the win. The model had no pit strategy simulation. Fixed in v5: every Monte Carlo run now simulates 1-stop vs 2-stop decisions, pit crew speed differences, and bad pit stop probability.
-
-Verstappen recovered from P20 to P6. The model gave him 0.56% win probability. Active aero helped him gain 14 positions. The overtake boost was too conservative. Adjusted in v5.
-
-Tyre degradation determined strategy. The model treated it as random noise. Now tyre_management is an 8% weighted feature and the simulation applies team-specific degradation penalties every run.
-
-Track temperature affected tyre behavior. Not modeled before. Now track_temp is a feature and the simulation adjusts variance based on surface temperature.
-
-Feature count went from 13 to 18. Softmax temperature went from 0.14 to 0.08 (more decisive predictions).
-
-## How self-calibration works
-
-After each race, I enter the top 10 finishing order. The model compares predicted rankings vs actual positions.
-
-If it ranked a driver too high (predicted P2, finished P8), it looks at which features scored high for that driver and decreases their weights. If it ranked someone too low, it increases the weights.
-
-The learning rate starts at 0.05 and decays by 30% after each race. This means early races cause bigger weight shifts. By Race 5, adjustments are smaller and more precise. By Race 10, the weights are stable and data-driven.
-
-It's gradient descent on 18 feature weights, with one training example per race. Not a lot of data, but enough to correct the worst hand-tuning mistakes.
-
-## China GP result (Round 2, March 15)
-
-**Predicted: Lewis Hamilton (55.25%) from P3. Actual: Kimi Antonelli won from pole by 5.5s.**
-
-| # | Predicted | Win% | Actual |
-|---|-----------|------|--------|
-| 1 | Lewis Hamilton | 55.25% | P3 |
-| 2 | George Russell | 18.04% | P2 |
-| 3 | Kimi Antonelli | 8.99% | P1 (WINNER) |
-| 4 | Charles Leclerc | 8.5% | P4 |
-| 5 | Lando Norris | 2.33% | DNS |
-
-Wrong winner. But the three predicted podium drivers (Hamilton, Russell, Antonelli) were the actual top 3. Different order. Leclerc P4 was an exact match. 7 of 22 cars DNS/DNF'd (32%).
-
-Why the model was wrong: Hamilton's 6 Shanghai wins inflated his score. Track history compounded through multiple features. Antonelli drove a clean race from pole and the car advantage was decisive. Pole has now won both 2026 races.
-
-What the self-calibration changed: increased quali_pace and grid_win_rate weights, decreased track_history. The model now trusts qualifying pace more and historical wins less.
-
-## Japan GP Result (Round 3, March 29)
-
-**Predicted: Kimi Antonelli (40.11%) from pole. Actual: Antonelli won by 13.7 seconds. CORRECT.**
-
-| # | Predicted | Win% | Actual |
-|---|-----------|------|--------|
-| 1 | Kimi Antonelli | 40.11% | P1 (WINNER) |
-| 2 | George Russell | 16.01% | P4 |
-| 3 | Lewis Hamilton | 14.14% | P6 |
-| 4 | Charles Leclerc | 8.79% | P3 |
-| 5 | Lando Norris | 3.40% | P5 |
-
-Antonelli dropped to P6 at the start. Piastri took the lead. On lap 22, Bearman crashed (50G, no fractures). Safety car came out. Antonelli hadn't pitted yet. He came in under the safety car, emerged P1, and won by 13.7 seconds.
-
-The Monte Carlo simulation captures exactly this scenario. In thousands of the 100,000 simulations, the polesitter loses positions early, a safety car resets the field, and the fastest car wins on pure pace. That's why Antonelli still had 40% even though losing the start was a real possibility.
-
-Hamilton finished P6 from P6. The model had him at 14.14% (predicted P3). Still overrated. The calibration after this race will decrease his feature scores further. Leclerc P3 actual vs P4 predicted. Piastri P2 was the surprise, not predicted in the top 5.
-
-Stroll retired (water pressure). Bearman crashed out (50G). Albon had 6 pit stops. The grid's reliability issues continue.
-
-## Early 2026 pattern (3 races in)
-
-Mercedes has won all three races. Pole has won all three races. Antonelli has won the last two back-to-back, taking the championship lead at 19 years old. Energy management and qualifying pace are the two features that matter most. The model's 2026 regulation adjustments continue to be validated: elevated DNF rates, energy uncertainty, and active aero overtaking are all real factors.
-
-The Hamilton overrating problem is clear: track history and experience features push him too high when he qualifies poorly. The calibration is correcting this race by race.
-
-## What's next
-
-Race 4: Miami GP, May 1. The model now has 3 races of calibration data (~50 training rows). Time to add XGBoost alongside Monte Carlo. Two models, side by side, agreeing or disagreeing.
-
-## Project structure
-
-```
-F1-predictions/
-    app.py              Dashboard (one page, dark theme)
-    engine.py           Prediction engine (18 features, 100K sims)
-    config.json         Weights + accuracy history
-    races/
-        01_australia/   Data + prediction + result
-        02_china/       Data + prediction + result
-        03_japan/       Data + prediction + result
-    archive/            Old model versions (v1-v3)
-    .streamlit/         Theme config
-    requirements.txt
-```
-
-## Running it
-
-```
+```bash
 git clone https://github.com/brinda0301/F1-predictions.git
 cd F1-predictions
 python -m venv venv
-.\venv\Scripts\Activate.ps1       # Windows
+.\venv\Scripts\Activate.ps1   # Windows
+source venv/bin/activate      # Linux/Mac
 pip install -r requirements.txt
+```
+
+## Usage
+
+Run prediction for a specific race:
+
+```bash
+python engine.py 04_miami
+```
+
+Launch the dashboard:
+
+```bash
 streamlit run app.py
 ```
 
-Or from the terminal:
+Submit a race result and calibrate (from the dashboard or CLI):
+
+```bash
+python -c "from engine import calibrate; calibrate(4)"
+```
+
+## File Structure
 
 ```
-python engine.py 02_china
+f1-gp-predictor/
+├── engine.py              # Prediction engine: Monte Carlo + XGBoost + calibration
+├── app.py                 # Streamlit dashboard
+├── config.json            # Feature weights + accuracy history + regulation params
+├── requirements.txt
+└── races/
+    ├── 01_australia/
+    │   ├── data.py        # Qualifying, practice, sprint, tyres, weather
+    │   ├── prediction.json # Generated by engine.py
+    │   └── result.json    # Actual race result (created on submit)
+    ├── 02_china/
+    ├── 03_japan/
+    └── 04_miami/
 ```
 
-## Adding a new race
+## Tech Stack
 
-Create `races/03_japan/data.py` with qualifying grid, practice times, sprint results, tyre compounds, circuit info, and weather. Run the prediction. After the race, submit the result. Model calibrates itself.
+- Python 3.12
+- NumPy (Monte Carlo simulations)
+- XGBoost + scikit-learn (data-driven model)
+- Streamlit (dashboard)
+- Plotly (charts)
 
-## Tech stack
+## What's Next
 
-Python, NumPy, Streamlit, Plotly, FastF1
+- **Round 5**: Canadian GP, May 22 to 24, 2026
+- XGBoost training set will grow to 88 rows
+- Calibrated weights from R4 lock in pole confidence
+- Monte Carlo aiming for 4/5 winners. XGBoost aiming for first correct call.
 
-## License
+---
 
-MIT
+Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/mar-antaya/).
