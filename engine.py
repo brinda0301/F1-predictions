@@ -737,9 +737,9 @@ def calibrate(race_round):
             if feat_name not in adjustments or feat_val <= 0.5:
                 continue
             if error > 0:
-                adjustments[feat_name] -= lr * feat_val * 0.1
-            elif error < 0:
                 adjustments[feat_name] += lr * feat_val * 0.1
+            elif error < 0:
+                adjustments[feat_name] -= lr * feat_val * 0.1
 
     for feat, adj in adjustments.items():
         weights[feat] = max(0.01, weights[feat] + adj)

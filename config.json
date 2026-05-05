@@ -1,33 +1,28 @@
 {
-  "model_version": "v5_full_factor",
-  "last_calibrated_after_round": 4,
   "weights": {
-    "quali_pace": 0.1857,
-    "race_pace": 0.101,
-    "energy_score": 0.0916,
-    "sprint_score": 0.072,
-    "tyre_management": 0.0634,
-    "grid_win_rate": 0.0657,
-    "practice_pace": 0.0551,
-    "reliability": 0.0536,
-    "fuel_quality": 0.0491,
-    "adaptability": 0.0504,
-    "start_score": 0.0362,
-    "teammate_gap": 0.0386,
-    "pit_execution": 0.0253,
-    "circuit_fit": 0.0317,
-    "track_temp": 0.0165,
-    "dirty_air": 0.0239,
-    "tyre_compound_fit": 0.0167,
-    "track_history": 0.0234
+    "quali_pace": 0.1906,
+    "race_pace": 0.1063,
+    "energy_score": 0.0973,
+    "sprint_score": 0.0787,
+    "tyre_management": 0.0685,
+    "grid_win_rate": 0.0661,
+    "practice_pace": 0.0574,
+    "reliability": 0.0484,
+    "fuel_quality": 0.0467,
+    "adaptability": 0.0336,
+    "start_score": 0.0393,
+    "teammate_gap": 0.0309,
+    "pit_execution": 0.0303,
+    "circuit_fit": 0.0271,
+    "track_temp": 0.0211,
+    "dirty_air": 0.0162,
+    "tyre_compound_fit": 0.0211,
+    "track_history": 0.0203
   },
   "regulation_params": {
-    "pole_win_rate": 0.45,
-    "overtake_factor": 1.4,
-    "energy_uncertainty": 0.06,
-    "softmax_temperature": 0.08,
-    "dirty_air_retention": 0.9
+    "softmax_temperature": 0.11
   },
+  "last_calibrated_after_round": 4,
   "accuracy_history": [
     {
       "round": 1,
@@ -36,64 +31,31 @@
       "predicted_win_pct": 59.1,
       "actual_winner": "George Russell",
       "correct": true,
-      "podium_predicted": [
-        "George Russell",
-        "Lewis Hamilton",
-        "Charles Leclerc"
-      ],
-      "podium_actual": [
-        "George Russell",
-        "Kimi Antonelli",
-        "Charles Leclerc"
-      ],
-      "podium_overlap": 2,
-      "mean_position_error": 3.5
+      "podium_overlap": 2
     },
     {
       "round": 2,
       "race": "China",
       "predicted_winner": "Lewis Hamilton",
       "predicted_win_pct": 55.25,
-      "actual_winner": "Kimi Antonelli",
+      "actual_winner": "Andrea Kimi Antonelli",
       "correct": false,
-      "podium_predicted": [
-        "Lewis Hamilton",
-        "George Russell",
-        "Kimi Antonelli"
-      ],
-      "podium_actual": [
-        "Kimi Antonelli",
-        "George Russell",
-        "Lewis Hamilton"
-      ],
-      "podium_overlap": 3,
-      "mean_position_error": 4.5
+      "podium_overlap": 3
     },
     {
       "round": 3,
       "race": "Japan",
-      "predicted_winner": "Kimi Antonelli",
-      "predicted_win_pct": 49.28,
-      "actual_winner": "Kimi Antonelli",
+      "predicted_winner": "Andrea Kimi Antonelli",
+      "predicted_win_pct": 40.11,
+      "actual_winner": "Andrea Kimi Antonelli",
       "correct": true,
-      "podium_predicted": [
-        "Kimi Antonelli",
-        "George Russell",
-        "Lewis Hamilton"
-      ],
-      "podium_actual": [
-        "Kimi Antonelli",
-        "Oscar Piastri",
-        "Charles Leclerc"
-      ],
-      "podium_overlap": 1,
-      "mean_position_error": 0.36
+      "podium_overlap": 1
     },
     {
       "round": 4,
       "race": "Miami",
       "predicted_winner": "Andrea Kimi Antonelli",
-      "predicted_win_pct": 23.95,
+      "predicted_win_pct": 19.2,
       "actual_winner": "Andrea Kimi Antonelli",
       "correct": true,
       "podium_predicted": [
@@ -107,7 +69,7 @@
         "Oscar Piastri"
       ],
       "podium_overlap": 2,
-      "mean_position_error": 4.78,
+      "mean_position_error": 4.72,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 1
     }
