@@ -22,7 +22,7 @@ TEAM_COLORS = {
 }
 
 st.markdown("""<style>
-    .block-container { max-width: 1200px; padding-top: 1rem; }
+    .block-container { max-width: 1200px; padding-top: 3rem; }
     div[data-testid="stMetricValue"] { font-size: 28px; font-family: monospace; }
 </style>""", unsafe_allow_html=True)
 
@@ -42,7 +42,7 @@ st.markdown(f"""
     <div>
         <div style="font-size:9px;letter-spacing:3px;color:#555;">SELF-CALIBRATING ML MODEL</div>
         <div style="font-size:28px;font-weight:900;color:white;font-family:monospace;">F1 2026 RACE PREDICTOR</div>
-        <div style="font-size:11px;color:#666;">100K Monte Carlo sims per race | Zero betting data | 2026 regulation-aware</div>
+        <div style="font-size:11px;color:#666;">100K Monte Carlo + XGBoost | Zero betting data | 2026 regulation-aware</div>
     </div>
     <div style="text-align:right;">
         <div style="font-size:9px;letter-spacing:2px;color:#555;">WINNER ACCURACY</div>
@@ -62,7 +62,7 @@ if not predicted_races:
         selected = st.selectbox("Race with qualifying data", available,
                                  format_func=lambda x: x.replace("_", " ").title())
         if st.button("🏎️ Run 100K Simulations", type="primary"):
-            with st.spinner("Running 100,000 Monte Carlo simulations..."):
+            with st.spinner("Running 100,000 Monte Carlo simulations + XGBoost..."):
                 predict(selected, config)
             st.balloons()
             st.rerun()
@@ -77,6 +77,8 @@ result = load_result(selected)
 predictions = pred["predictions"]
 winner = predictions[0]
 race_info = pred.get("race", {})
+xgb = pred.get("xgboost")
+models_agree = pred.get("models_agree")
 
 actual_winner = None
 if result:
@@ -94,7 +96,7 @@ with col1:
     st.markdown(f"""
     <div style="background:linear-gradient(135deg,rgba(0,210,190,0.1),rgba(0,210,190,0.02));
                 border:1px solid rgba(0,210,190,0.3);border-radius:12px;padding:24px;">
-        <div style="font-size:10px;letter-spacing:3px;color:#00D2BE;">PREDICTED WINNER{status}</div>
+        <div style="font-size:10px;letter-spacing:3px;color:#00D2BE;">MONTE CARLO PICK{status}</div>
         <div style="font-size:32px;font-weight:900;color:white;font-family:monospace;">{winner['driver']}</div>
         <div style="font-size:14px;color:{TEAM_COLORS.get(winner['team'],'#888')};">
             {winner['team']} | P{winner['grid_pos']} on Grid | DNF Risk: {winner['dnf_pct']}%</div>
@@ -111,7 +113,7 @@ with col2:
 st.markdown("")
 
 # ============================================================
-# SECTION 1.5: TOP 3 PODIUM CARDS
+# SECTION 1.5: TOP 3 PODIUM CARDS (Monte Carlo)
 # ============================================================
 top3 = predictions[:3]
 p1, p2, p3 = top3[0], top3[1], top3[2]
@@ -145,6 +147,106 @@ with col_r:
 st.markdown("")
 
 # ============================================================
+# SECTION 1.7: XGBOOST COMPARISON (added R4 Miami)
+# ============================================================
+if xgb and xgb.get("available"):
+    st.markdown("---")
+    st.markdown("### 🤖 XGBoost vs Monte Carlo")
+
+    # Agreement banner
+    if models_agree:
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,rgba(0,255,136,0.12),rgba(0,255,136,0.02));
+                    border:1px solid rgba(0,255,136,0.4);border-radius:10px;padding:14px 20px;margin-bottom:14px;">
+            <span style="color:#00ff88;font-weight:900;letter-spacing:2px;">✓ MODELS AGREE</span>
+            <span style="color:#cfcfcf;margin-left:12px;">Both models picked the same winner</span>
+        </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,rgba(255,136,0,0.12),rgba(255,136,0,0.02));
+                    border:1px solid rgba(255,136,0,0.4);border-radius:10px;padding:14px 20px;margin-bottom:14px;">
+            <span style="color:#ff8800;font-weight:900;letter-spacing:2px;">⚠ MODELS DISAGREE</span>
+            <span style="color:#cfcfcf;margin-left:12px;">The two models picked different winners</span>
+        </div>""", unsafe_allow_html=True)
+
+    # Side by side cards
+    mc_top = predictions[0]
+    xgb_top = xgb["predictions"][0]
+    mc_color = TEAM_COLORS.get(mc_top["team"], "#00D2BE")
+    xgb_color = TEAM_COLORS.get(xgb_top["team"], "#FFD700")
+
+    col_mc, col_xgb = st.columns(2)
+
+    with col_mc:
+        st.markdown(f"""
+        <div style="background:#111128;border:1px solid rgba(0,210,190,0.4);border-radius:10px;padding:18px;height:170px;">
+            <div style="font-size:10px;letter-spacing:2px;color:#00D2BE;">MONTE CARLO</div>
+            <div style="font-size:11px;color:#666;">Simulation-based | 100K runs</div>
+            <div style="font-size:20px;font-weight:900;color:white;font-family:monospace;margin-top:10px;">{mc_top['driver']}</div>
+            <div style="font-size:12px;color:{mc_color};">{mc_top['team']}</div>
+            <div style="font-size:28px;font-weight:900;color:#00D2BE;font-family:monospace;margin-top:8px;">{mc_top['win_pct']}%</div>
+            <div style="font-size:10px;color:#888;">win probability | P{mc_top['grid_pos']} grid</div>
+        </div>""", unsafe_allow_html=True)
+
+    with col_xgb:
+        xgb_pct = round(xgb_top["win_prob"] * 100, 2)
+        st.markdown(f"""
+        <div style="background:#111128;border:1px solid rgba(255,215,0,0.4);border-radius:10px;padding:18px;height:170px;">
+            <div style="font-size:10px;letter-spacing:2px;color:#FFD700;">XGBOOST</div>
+            <div style="font-size:11px;color:#666;">Data-driven | trained on {xgb['trained_rows']} rows | MAE {xgb['mae']}</div>
+            <div style="font-size:20px;font-weight:900;color:white;font-family:monospace;margin-top:10px;">{xgb_top['driver']}</div>
+            <div style="font-size:12px;color:{TEAM_COLORS.get(xgb_top['team'],'#888')};">{xgb_top['team']}</div>
+            <div style="font-size:28px;font-weight:900;color:#FFD700;font-family:monospace;margin-top:8px;">P{xgb_top['predicted_position']}</div>
+            <div style="font-size:10px;color:#888;">predicted finish | {xgb_pct}% win prob</div>
+        </div>""", unsafe_allow_html=True)
+
+    # Top 3 from each model side by side
+    st.markdown("")
+    st.markdown("**Predicted Podium Comparison**")
+    col_mc2, col_xgb2 = st.columns(2)
+
+    with col_mc2:
+        st.markdown("<div style='font-size:11px;color:#00D2BE;letter-spacing:2px;'>MONTE CARLO TOP 3</div>", unsafe_allow_html=True)
+        for i, p in enumerate(predictions[:3], 1):
+            tc = TEAM_COLORS.get(p["team"], "#888")
+            st.markdown(f"<div style='background:#111128;border-left:3px solid {tc};padding:8px 12px;margin:4px 0;font-family:monospace;'>P{i} <strong>{p['driver']}</strong> <span style='color:#888;'>{p['team']}</span> <span style='float:right;color:#00D2BE;'>{p['win_pct']}%</span></div>", unsafe_allow_html=True)
+
+    with col_xgb2:
+        st.markdown("<div style='font-size:11px;color:#FFD700;letter-spacing:2px;'>XGBOOST TOP 3</div>", unsafe_allow_html=True)
+        for i, p in enumerate(xgb["predictions"][:3], 1):
+            tc = TEAM_COLORS.get(p["team"], "#888")
+            st.markdown(f"<div style='background:#111128;border-left:3px solid {tc};padding:8px 12px;margin:4px 0;font-family:monospace;'>P{i} <strong>{p['driver']}</strong> <span style='color:#888;'>{p['team']}</span> <span style='float:right;color:#FFD700;'>pos {p['predicted_position']}</span></div>", unsafe_allow_html=True)
+
+    # Feature importance chart
+    st.markdown("")
+    st.markdown("**XGBoost Feature Importance** (which features drive the model's predictions)")
+    importance = xgb.get("feature_importance", {})
+    if importance:
+        sorted_imp = sorted(importance.items(), key=lambda x: x[1], reverse=True)
+        fig_imp = go.Figure()
+        fig_imp.add_trace(go.Bar(
+            y=[k.replace("_", " ") for k, _ in sorted_imp],
+            x=[round(v * 100, 2) for _, v in sorted_imp],
+            orientation="h", marker_color="#FFD700", marker_opacity=0.7,
+            text=[f"{round(v * 100, 1)}%" for _, v in sorted_imp],
+            textposition="outside", textfont=dict(color="#e0e0e0", size=10),
+        ))
+        fig_imp.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111128",
+            font=dict(family="monospace", color="#e0e0e0", size=10),
+            xaxis=dict(title="Importance %", gridcolor="rgba(255,255,255,0.05)"),
+            margin=dict(l=120, t=20, b=40), height=400,
+        )
+        st.plotly_chart(fig_imp, use_container_width=True)
+
+    st.markdown("---")
+
+elif xgb and not xgb.get("available"):
+    st.info(f"🤖 XGBoost: {xgb.get('reason', 'not enough training data yet')}. Will activate once enough race results are submitted.")
+elif xgb is None:
+    st.info("🤖 XGBoost not installed. Run `pip install xgboost` to enable the second model.")
+
+# ============================================================
 # SECTION 2: WIN PROBABILITY CHART
 # ============================================================
 top10 = predictions[:10]
@@ -159,7 +261,7 @@ fig.add_trace(go.Bar(
     textfont=dict(size=11, color="#e0e0e0"),
 ))
 fig.update_layout(
-    title="Win Probability (Top 10)",
+    title="Win Probability (Top 10) - Monte Carlo",
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#111128",
     font=dict(family="monospace", color="#e0e0e0"),
     xaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
@@ -203,10 +305,16 @@ with c2:
 # ============================================================
 st.markdown("### Full Grid")
 table = []
+xgb_pos_lookup = {}
+if xgb and xgb.get("available"):
+    xgb_pos_lookup = {p["driver"]: p["predicted_position"] for p in xgb["predictions"]}
+
 for i, p in enumerate(predictions):
     row = {"#": i+1, "Driver": p["driver"], "Team": p["team"],
-           "Grid": f"P{p['grid_pos']}", "Win%": p["win_pct"],
-           "Podium%": p["podium_pct"], "DNF%": p["dnf_pct"]}
+           "Grid": f"P{p['grid_pos']}", "MC Win%": p["win_pct"],
+           "MC Podium%": p["podium_pct"], "MC DNF%": p["dnf_pct"]}
+    if xgb_pos_lookup:
+        row["XGB Pos"] = xgb_pos_lookup.get(p["driver"], "?")
     if result:
         actual = next((r for r in result["result"] if r["driver"] == p["driver"]), None)
         if actual and actual.get("pos"):
@@ -225,27 +333,38 @@ if history:
     st.markdown("---")
     st.markdown("### Season Accuracy")
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Races", len(history))
-    c2.metric("Winners Correct", f"{correct}/{len(history)}")
+    c2.metric("MC Winners Correct", f"{correct}/{len(history)}")
     avg_pod = np.mean([h.get("podium_overlap", 0) for h in history])
-    c3.metric("Avg Podium Overlap", f"{avg_pod:.1f}/3")
+    c3.metric("MC Avg Podium Overlap", f"{avg_pod:.1f}/3")
+    xgb_correct = sum(1 for h in history if h.get("xgb_winner_correct"))
+    xgb_total = sum(1 for h in history if h.get("xgb_winner_correct") is not None)
+    if xgb_total:
+        c4.metric("XGB Winners Correct", f"{xgb_correct}/{xgb_total}")
+    else:
+        c4.metric("XGB Winners Correct", "—")
 
     for h in history:
-        col1, col2 = st.columns([4, 1])
+        col1, col2, col3 = st.columns([4, 1, 1])
         with col1:
             st.markdown(f"**R{h['round']} {h['race']}** — Predicted: {h['predicted_winner']} ({h['predicted_win_pct']}%) — Actual: {h['actual_winner']}")
         with col2:
-            if h.get("correct"):
-                st.success("✅")
+            st.markdown("MC: " + ("✅" if h.get("correct") else "❌"))
+        with col3:
+            xgb_c = h.get("xgb_winner_correct")
+            if xgb_c is True:
+                st.markdown("XGB: ✅")
+            elif xgb_c is False:
+                st.markdown("XGB: ❌")
             else:
-                st.error("❌")
+                st.markdown("XGB: —")
 
 # ============================================================
 # SECTION 6: MODEL WEIGHTS
 # ============================================================
 st.markdown("---")
-st.markdown("### Model Weights (self-calibrating)")
+st.markdown("### Monte Carlo Feature Weights (self-calibrating)")
 st.caption(f"Calibrated after Round {config.get('last_calibrated_after_round', 0)}. Weights adjust after each race result.")
 
 weights = config["weights"]
@@ -278,7 +397,7 @@ with c1:
     if available:
         run_race = st.selectbox("Race", available, key="run",
                                  format_func=lambda x: x.replace("_", " ").title())
-        if st.button("🏎️ Run 100K Simulations", type="primary"):
+        if st.button("🏎️ Run 100K Simulations + XGBoost", type="primary"):
             with st.spinner("Simulating..."):
                 predict(run_race, config)
             st.balloons()
@@ -307,7 +426,6 @@ with c2:
                 if p2: top3.append({"pos": 2, "driver": p2, "team": "", "status": "Finished"})
                 if p3: top3.append({"pos": 3, "driver": p3, "team": "", "status": "Finished"})
 
-                # Add remaining drivers with estimated positions
                 pos = len(top3) + 1
                 for d in drivers:
                     if d not in [t["driver"] for t in top3]:
@@ -325,4 +443,4 @@ with c2:
 
 # Footer
 st.markdown("---")
-st.caption("F1 2026 Race Predictor | Self-calibrating ML model | Zero betting data | Built with Streamlit + Plotly + NumPy")
+st.caption("F1 2026 Race Predictor | Monte Carlo + XGBoost | Self-calibrating | Built with Streamlit + Plotly + NumPy + scikit-learn")
