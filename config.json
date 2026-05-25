@@ -1,23 +1,23 @@
 {
   "weights": {
-    "quali_pace": 0.193,
-    "race_pace": 0.1062,
-    "energy_score": 0.0977,
-    "sprint_score": 0.0726,
+    "quali_pace": 0.1891,
+    "race_pace": 0.1051,
+    "energy_score": 0.0978,
+    "sprint_score": 0.0717,
     "tyre_management": 0.0683,
-    "grid_win_rate": 0.0678,
-    "practice_pace": 0.056,
-    "reliability": 0.0475,
-    "fuel_quality": 0.0458,
-    "adaptability": 0.0402,
-    "start_score": 0.0393,
-    "teammate_gap": 0.0303,
-    "pit_execution": 0.029,
-    "circuit_fit": 0.0255,
-    "track_temp": 0.0192,
-    "dirty_air": 0.0146,
-    "tyre_compound_fit": 0.0191,
-    "track_history": 0.028
+    "grid_win_rate": 0.0657,
+    "practice_pace": 0.0566,
+    "reliability": 0.0497,
+    "fuel_quality": 0.0466,
+    "adaptability": 0.0385,
+    "start_score": 0.0381,
+    "teammate_gap": 0.0292,
+    "pit_execution": 0.0308,
+    "circuit_fit": 0.0265,
+    "track_temp": 0.0206,
+    "dirty_air": 0.0159,
+    "tyre_compound_fit": 0.0205,
+    "track_history": 0.0291
   },
   "regulation_params": {
     "softmax_temperature": 0.11
@@ -77,13 +77,13 @@
       "round": 5,
       "race": "Canada",
       "predicted_winner": "George Russell",
-      "predicted_win_pct": 41.1,
+      "predicted_win_pct": 40.07,
       "actual_winner": "Andrea Kimi Antonelli",
       "correct": false,
       "podium_predicted": [
         "George Russell",
-        "Lando Norris",
-        "Lewis Hamilton"
+        "Lewis Hamilton",
+        "Lando Norris"
       ],
       "podium_actual": [
         "Andrea Kimi Antonelli",
@@ -91,7 +91,7 @@
         "Max Verstappen"
       ],
       "podium_overlap": 1,
-      "mean_position_error": 0.64,
+      "mean_position_error": 5.5,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 1
     }
