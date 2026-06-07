@@ -1,23 +1,23 @@
 {
   "weights": {
-    "quali_pace": 0.1891,
-    "race_pace": 0.1051,
-    "energy_score": 0.0978,
-    "sprint_score": 0.0717,
-    "tyre_management": 0.0683,
-    "grid_win_rate": 0.0657,
+    "quali_pace": 0.1894,
+    "race_pace": 0.1052,
+    "energy_score": 0.0979,
+    "sprint_score": 0.0697,
+    "tyre_management": 0.0684,
+    "grid_win_rate": 0.0658,
     "practice_pace": 0.0566,
-    "reliability": 0.0497,
+    "reliability": 0.0498,
     "fuel_quality": 0.0466,
-    "adaptability": 0.0385,
-    "start_score": 0.0381,
-    "teammate_gap": 0.0292,
-    "pit_execution": 0.0308,
+    "adaptability": 0.0401,
+    "start_score": 0.0371,
+    "teammate_gap": 0.0282,
+    "pit_execution": 0.0307,
     "circuit_fit": 0.0265,
-    "track_temp": 0.0206,
+    "track_temp": 0.0205,
     "dirty_air": 0.0159,
-    "tyre_compound_fit": 0.0205,
-    "track_history": 0.0291
+    "tyre_compound_fit": 0.0204,
+    "track_history": 0.0312
   },
   "regulation_params": {
     "softmax_temperature": 0.11
@@ -91,7 +91,7 @@
         "Max Verstappen"
       ],
       "podium_overlap": 1,
-      "mean_position_error": 5.5,
+      "mean_position_error": 0.45,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 1
     }
