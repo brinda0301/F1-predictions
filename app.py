@@ -85,30 +85,98 @@ if result:
     actual_winner = next((r["driver"] for r in result["result"] if r.get("pos") == 1), None)
 
 # ============================================================
-# SECTION 1: PREDICTED WINNER
+# SECTION 1: DUAL WINNER MEDAL CARDS (both models, podium style)
 # ============================================================
-status = ""
-if actual_winner:
-    status = " ✅ CORRECT" if actual_winner == winner["driver"] else f" ❌ Actual: {actual_winner}"
 
-col1, col2 = st.columns([3, 1])
-with col1:
+# Race info banner
+st.markdown(f"""
+<div style="background:#0a0a1a;border:1px solid rgba(255,255,255,0.08);
+            border-radius:10px;padding:14px 20px;margin-bottom:16px;">
+    <div style="font-size:11px;color:#555;letter-spacing:2px;">RACE</div>
+    <div style="font-size:18px;font-weight:700;color:white;font-family:monospace;">
+        {race_info.get('name','')} | {race_info.get('circuit','')} | {race_info.get('date','')}
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# Compute status badges for both models
+mc_winner_driver = winner["driver"]
+xgb_top = xgb["predictions"][0] if (xgb and xgb.get("available")) else None
+xgb_winner_driver = xgb_top["driver"] if xgb_top else None
+
+mc_badge = ""
+xgb_badge = ""
+if actual_winner:
+    if actual_winner == mc_winner_driver:
+        mc_badge = '<div style="font-size:11px;color:#00ff88;font-weight:900;letter-spacing:2px;margin-top:6px;">✅ CORRECT</div>'
+    else:
+        mc_badge = '<div style="font-size:11px;color:#ff5555;font-weight:900;letter-spacing:2px;margin-top:6px;">❌ WRONG</div>'
+    if xgb_winner_driver:
+        if actual_winner == xgb_winner_driver:
+            xgb_badge = '<div style="font-size:11px;color:#00ff88;font-weight:900;letter-spacing:2px;margin-top:6px;">✅ CORRECT</div>'
+        else:
+            xgb_badge = '<div style="font-size:11px;color:#ff5555;font-weight:900;letter-spacing:2px;margin-top:6px;">❌ WRONG</div>'
+
+# Two big medal winner cards, side by side
+col_mc, col_xgb = st.columns(2)
+
+with col_mc:
+    mc_color = TEAM_COLORS.get(winner["team"], "#00D2BE")
     st.markdown(f"""
-    <div style="background:linear-gradient(135deg,rgba(0,210,190,0.1),rgba(0,210,190,0.02));
-                border:1px solid rgba(0,210,190,0.3);border-radius:12px;padding:24px;">
-        <div style="font-size:10px;letter-spacing:3px;color:#00D2BE;">MONTE CARLO PICK{status}</div>
-        <div style="font-size:32px;font-weight:900;color:white;font-family:monospace;">{winner['driver']}</div>
-        <div style="font-size:14px;color:{TEAM_COLORS.get(winner['team'],'#888')};">
-            {winner['team']} | P{winner['grid_pos']} on Grid | DNF Risk: {winner['dnf_pct']}%</div>
-        <div style="font-size:11px;color:#555;margin-top:4px;">
-            {race_info.get('name','')} | {race_info.get('circuit','')} | {race_info.get('date','')}</div>
-    </div>""", unsafe_allow_html=True)
-with col2:
+    <div style="background:#111128;border:2px solid {mc_color}88;border-radius:12px;padding:24px;text-align:center;height:340px;">
+        <div style="font-size:10px;letter-spacing:3px;color:#00D2BE;font-weight:900;">MONTE CARLO WINNER</div>
+        <div style="font-size:9px;color:#666;margin-top:2px;">100K SIMULATIONS</div>
+        <div style="font-size:46px;margin-top:8px;">🥇</div>
+        <div style="font-size:22px;font-weight:900;color:white;font-family:monospace;margin-top:6px;">{winner['driver']}</div>
+        <div style="font-size:13px;color:{mc_color};margin-top:2px;">{winner['team']}</div>
+        <div style="font-size:44px;font-weight:900;color:{mc_color};font-family:monospace;margin-top:10px;line-height:1;">{winner['win_pct']}%</div>
+        <div style="font-size:11px;color:#888;">P{winner['grid_pos']} grid | {winner['podium_pct']}% podium | {winner['dnf_pct']}% DNF</div>
+        {mc_badge}
+    </div>
+    """, unsafe_allow_html=True)
+
+with col_xgb:
+    if xgb_top:
+        xgb_color = TEAM_COLORS.get(xgb_top["team"], "#FFD700")
+        xgb_win_pct = round(xgb_top["win_prob"] * 100, 2)
+        mae = xgb.get("mae", "n/a")
+        rows = xgb.get("trained_rows", 0)
+        st.markdown(f"""
+        <div style="background:#111128;border:2px solid {xgb_color}88;border-radius:12px;padding:24px;text-align:center;height:340px;">
+            <div style="font-size:10px;letter-spacing:3px;color:#FFD700;font-weight:900;">XGBOOST WINNER</div>
+            <div style="font-size:9px;color:#666;margin-top:2px;">{rows} TRAINING ROWS | MAE {mae}</div>
+            <div style="font-size:46px;margin-top:8px;">🥇</div>
+            <div style="font-size:22px;font-weight:900;color:white;font-family:monospace;margin-top:6px;">{xgb_top['driver']}</div>
+            <div style="font-size:13px;color:{xgb_color};margin-top:2px;">{xgb_top['team']}</div>
+            <div style="font-size:44px;font-weight:900;color:#FFD700;font-family:monospace;margin-top:10px;line-height:1;">{xgb_win_pct}%</div>
+            <div style="font-size:11px;color:#888;">P{xgb_top['grid_pos']} grid | predicted finish P{xgb_top['predicted_position']}</div>
+            {xgb_badge}
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div style="background:#111128;border:1px dashed rgba(255,215,0,0.3);border-radius:12px;padding:24px;text-align:center;height:340px;display:flex;flex-direction:column;justify-content:center;">
+            <div style="font-size:10px;letter-spacing:3px;color:#FFD700;font-weight:900;">XGBOOST</div>
+            <div style="font-size:46px;margin-top:14px;opacity:0.3;">🥇</div>
+            <div style="font-size:14px;color:#888;margin-top:14px;">Not enough training data yet</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# Actual winner banner (only shown after race is submitted)
+if actual_winner:
+    actual_team = next((r.get("team") for r in result["result"] if r["driver"] == actual_winner), "")
+    actual_color = TEAM_COLORS.get(actual_team, "#FFD700")
     st.markdown(f"""
-    <div style="text-align:right;padding-top:20px;">
-        <div style="font-size:52px;font-weight:900;color:#00D2BE;font-family:monospace;line-height:1;">{winner['win_pct']}%</div>
-        <div style="font-size:10px;color:#888;letter-spacing:2px;">WIN PROBABILITY</div>
-    </div>""", unsafe_allow_html=True)
+    <div style="background:linear-gradient(90deg,rgba(255,215,0,0.18),rgba(255,215,0,0.04));
+                border:2px solid rgba(255,215,0,0.5);border-radius:10px;
+                padding:18px 28px;margin-top:18px;text-align:center;">
+        <div style="font-size:11px;letter-spacing:4px;color:#FFD700;font-weight:900;">🏁 ACTUAL RACE WINNER</div>
+        <div style="font-size:32px;font-weight:900;color:white;font-family:monospace;margin-top:4px;">
+            {actual_winner}
+        </div>
+        <div style="font-size:14px;color:{actual_color};">{actual_team}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("")
 
@@ -136,6 +204,15 @@ def card_html(driver, medal, size, result_data):
     else:
         return f"<div style='background:#111128;border:1px solid {c}44;border-radius:12px;padding:18px;text-align:center;margin-top:40px;'><div style='font-size:24px;'>{medal}</div><div style='font-size:16px;font-weight:900;color:white;font-family:monospace;margin-top:4px;'>{driver['driver']}</div><div style='font-size:12px;color:{c};margin-top:2px;'>{driver['team']}</div><div style='font-size:28px;font-weight:900;color:{c};font-family:monospace;margin-top:8px;'>{driver['win_pct']}%</div><div style='font-size:10px;color:#888;'>P{driver['grid_pos']} grid | {driver['podium_pct']}% podium</div>{actual}</div>"
 
+# Section divider with Monte Carlo label
+st.markdown("""
+<div style="margin:8px 0 8px 0;padding:10px 16px;background:rgba(0,210,190,0.05);
+            border-left:3px solid #00D2BE;border-radius:4px;">
+    <span style="font-size:11px;letter-spacing:3px;color:#00D2BE;font-weight:900;">MONTE CARLO PODIUM</span>
+    <span style="font-size:11px;color:#666;margin-left:10px;">100K simulation prediction</span>
+</div>
+""", unsafe_allow_html=True)
+
 col_l, col_c, col_r = st.columns([2, 3, 2])
 with col_l:
     st.markdown(card_html(p2, "🥈", "small", result), unsafe_allow_html=True)
@@ -143,6 +220,49 @@ with col_c:
     st.markdown(card_html(p1, "🥇", "big", result), unsafe_allow_html=True)
 with col_r:
     st.markdown(card_html(p3, "🥉", "small", result), unsafe_allow_html=True)
+
+st.markdown("")
+
+# ============================================================
+# SECTION 1.6: XGBOOST PODIUM (mirror of MC podium, second row)
+# ============================================================
+if xgb and xgb.get("available"):
+    xgb_top3 = xgb["predictions"][:3]
+    xp1, xp2, xp3 = xgb_top3[0], xgb_top3[1], xgb_top3[2]
+
+    def xgb_card_html(driver, medal, size, result_data):
+        """Same style as MC podium cards but using XGBoost predicted positions."""
+        c = TEAM_COLORS.get(driver["team"], "#FFD700")
+        actual = ""
+        if result_data:
+            ap = next((r for r in result_data["result"] if r["driver"] == driver["driver"]), None)
+            if ap and ap.get("pos"):
+                actual = f"<div style='font-size:11px;color:#FFD700;margin-top:6px;'>Actual: P{ap['pos']}</div>"
+            elif ap:
+                actual = f"<div style='font-size:11px;color:#DC0000;margin-top:6px;'>{ap.get('status','DNF')}</div>"
+        win_pct = round(driver["win_prob"] * 100, 2)
+        pos = driver["predicted_position"]
+        if size == "big":
+            return f"<div style='background:#111128;border:2px solid {c}66;border-radius:12px;padding:24px;text-align:center;'><div style='font-size:36px;'>{medal}</div><div style='font-size:22px;font-weight:900;color:white;font-family:monospace;margin-top:4px;'>{driver['driver']}</div><div style='font-size:13px;color:{c};margin-top:2px;'>{driver['team']}</div><div style='font-size:42px;font-weight:900;color:{c};font-family:monospace;margin-top:10px;'>{win_pct}%</div><div style='font-size:11px;color:#888;'>P{driver['grid_pos']} grid | predicted finish P{pos}</div>{actual}</div>"
+        else:
+            return f"<div style='background:#111128;border:1px solid {c}44;border-radius:12px;padding:18px;text-align:center;margin-top:40px;'><div style='font-size:24px;'>{medal}</div><div style='font-size:16px;font-weight:900;color:white;font-family:monospace;margin-top:4px;'>{driver['driver']}</div><div style='font-size:12px;color:{c};margin-top:2px;'>{driver['team']}</div><div style='font-size:28px;font-weight:900;color:{c};font-family:monospace;margin-top:8px;'>{win_pct}%</div><div style='font-size:10px;color:#888;'>P{driver['grid_pos']} grid | finish P{pos}</div>{actual}</div>"
+
+    # Section divider with XGBoost label
+    st.markdown("""
+    <div style="margin:24px 0 8px 0;padding:10px 16px;background:rgba(255,215,0,0.05);
+                border-left:3px solid #FFD700;border-radius:4px;">
+        <span style="font-size:11px;letter-spacing:3px;color:#FFD700;font-weight:900;">XGBOOST PODIUM</span>
+        <span style="font-size:11px;color:#666;margin-left:10px;">data-driven model prediction</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_l2, col_c2, col_r2 = st.columns([2, 3, 2])
+    with col_l2:
+        st.markdown(xgb_card_html(xp2, "🥈", "small", result), unsafe_allow_html=True)
+    with col_c2:
+        st.markdown(xgb_card_html(xp1, "🥇", "big", result), unsafe_allow_html=True)
+    with col_r2:
+        st.markdown(xgb_card_html(xp3, "🥉", "small", result), unsafe_allow_html=True)
 
 st.markdown("")
 
