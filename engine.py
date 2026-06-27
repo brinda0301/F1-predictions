@@ -501,7 +501,15 @@ def predict(race_folder, config=None):
 
     race_data = load_race_data(race_folder)
     weights = config["weights"]
-    temp = config["regulation_params"]["softmax_temperature"]
+    # Track-dependent softmax temperature
+    circuit_type = race_data.get("CIRCUIT", {}).get("type", "balanced")
+    weather_rain = race_data.get("WEATHER", {}).get("rain_probability", 0)
+    temps = config["regulation_params"].get("track_type_temperatures", {})
+    default_temp = config["regulation_params"]["softmax_temperature"]
+    if weather_rain > 0.5:
+        temp = temps.get("wet", default_temp)
+    else:
+        temp = temps.get(circuit_type, default_temp)
 
     preds = []
     for driver in race_data["GRID"]:
@@ -656,6 +664,18 @@ def predict(race_folder, config=None):
         })
     results.sort(key=lambda x: x["win_pct"], reverse=True)
 
+    # DNF discount: winners must finish
+    for r in results:
+        discount = 1 - (r["dnf_pct"] / 100)
+        r["win_pct"] = round(r["win_pct"] * discount, 2)
+
+    # Renormalize so win_pct sums to 100
+    total_win = sum(r["win_pct"] for r in results)
+    if total_win > 0:
+        for r in results:
+            r["win_pct"] = round(r["win_pct"] * 100 / total_win, 2)
+    results.sort(key=lambda x: x["win_pct"], reverse=True)
+    
     # --- XGBoost (added R4) ---
     xgb_result = xgboost_predict(race_folder)
 
