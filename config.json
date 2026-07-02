@@ -1,19 +1,19 @@
 {
   "weights": {
-    "quali_pace": 0.1947,
-    "race_pace": 0.1087,
-    "energy_score": 0.1013,
+    "quali_pace": 0.1946,
+    "race_pace": 0.1086,
+    "energy_score": 0.1012,
     "sprint_score": 0.072,
     "tyre_management": 0.0697,
     "grid_win_rate": 0.068,
-    "practice_pace": 0.0541,
+    "practice_pace": 0.0543,
     "reliability": 0.0497,
-    "fuel_quality": 0.0455,
-    "adaptability": 0.0339,
-    "start_score": 0.0393,
-    "teammate_gap": 0.0272,
-    "pit_execution": 0.0325,
-    "circuit_fit": 0.0237,
+    "fuel_quality": 0.0453,
+    "adaptability": 0.0335,
+    "start_score": 0.0384,
+    "teammate_gap": 0.0281,
+    "pit_execution": 0.0326,
+    "circuit_fit": 0.0241,
     "track_temp": 0.0204,
     "dirty_air": 0.0128,
     "tyre_compound_fit": 0.0202,
@@ -22,13 +22,13 @@
   "regulation_params": {
     "softmax_temperature": 0.11,
     "track_type_temperatures": {
-        "street": 0.07,
-        "high_speed": 0.10,
-        "balanced": 0.12,
-        "wet": 0.18
+      "street": 0.07,
+      "high_speed": 0.1,
+      "balanced": 0.12,
+      "wet": 0.18
     }
   },
-  "last_calibrated_after_round": 7,
+  "last_calibrated_after_round": 8,
   "accuracy_history": [
     {
       "round": 1,
@@ -144,6 +144,28 @@
       "mean_position_error": 0.18,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 3
+    },
+    {
+      "round": 8,
+      "race": "Austria",
+      "predicted_winner": "George Russell",
+      "predicted_win_pct": 48.21,
+      "actual_winner": "George Russell",
+      "correct": true,
+      "podium_predicted": [
+        "George Russell",
+        "Lewis Hamilton",
+        "Max Verstappen"
+      ],
+      "podium_actual": [
+        "George Russell",
+        "Max Verstappen",
+        "Lewis Hamilton"
+      ],
+      "podium_overlap": 3,
+      "mean_position_error": 0.09,
+      "xgb_winner_correct": true,
+      "xgb_podium_overlap": 1
     }
   ]
 }
