@@ -65,6 +65,41 @@ def pretty_name(folder):
     return folder.title()
 
 
+# Full race names and circuits for the banner, keyed by folder.
+RACE_META = {
+    "01_australia":  ("Australian Grand Prix", "Albert Park, Melbourne"),
+    "02_china":      ("Chinese Grand Prix", "Shanghai International Circuit"),
+    "03_japan":      ("Japanese Grand Prix", "Suzuka Circuit"),
+    "04_miami":      ("Miami Grand Prix", "Miami International Autodrome"),
+    "05_canada":     ("Canadian Grand Prix", "Circuit Gilles Villeneuve"),
+    "06_monaco":     ("Monaco Grand Prix", "Circuit de Monaco"),
+    "07_barcelona":  ("Barcelona-Catalunya Grand Prix", "Circuit de Barcelona-Catalunya"),
+    "08_austria":    ("Austrian Grand Prix", "Red Bull Ring"),
+    "09_britain":    ("British Grand Prix", "Silverstone Circuit"),
+    "10_belgium":    ("Belgian Grand Prix", "Spa-Francorchamps"),
+    "11_hungary":    ("Hungarian Grand Prix", "Hungaroring"),
+    "12_netherlands": ("Dutch Grand Prix", "Circuit Zandvoort"),
+    "13_italy":      ("Italian Grand Prix", "Monza"),
+}
+
+
+def race_banner_text(folder, race_info):
+    """Prefer race_info from prediction.json, then RACE_META, then folder name."""
+    name = race_info.get("name") if race_info else None
+    circuit = race_info.get("circuit") if race_info else None
+    date = race_info.get("date") if race_info else None
+    if not name and folder in RACE_META:
+        name, circuit = RACE_META[folder]
+    if not name:
+        name = pretty_name(folder)
+    parts = [name]
+    if circuit:
+        parts.append(circuit)
+    if date:
+        parts.append(date)
+    return " | ".join(parts)
+
+
 config = load_config()
 folders = get_race_folders()
 predicted_races = [f for f in folders if load_prediction(f)]
@@ -106,7 +141,7 @@ with tab_race:
     if not predicted_races:
         st.warning("No predictions found. Add prediction.json files to the races folders.")
     else:
-        labels = {f: pretty_name(f) for f in predicted_races}
+        labels = {f: (RACE_META.get(f, (pretty_name(f),))[0]) for f in predicted_races}
         selected = st.selectbox(
             "Select Race",
             predicted_races,
@@ -133,7 +168,7 @@ with tab_race:
                     border-radius:10px;padding:14px 20px;margin-bottom:16px;">
             <div style="font-size:11px;color:#555;letter-spacing:2px;">RACE</div>
             <div style="font-size:18px;font-weight:700;color:white;font-family:monospace;">
-                {race_info.get('name', pretty_name(selected))} | {race_info.get('circuit','')} | {race_info.get('date','')}
+                {race_banner_text(selected, race_info)}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -273,7 +308,7 @@ with tab_season:
 st.markdown("")
 st.markdown(
     "<div style='text-align:center;color:#555;font-size:12px;'>"
-    "Built by Brinda Bhandary | Predictions committed to GitHub before each race | "
+    "Built by Brinda Bhanderi | Predictions committed to GitHub before each race | "
     "<a href='https://github.com/brinda0301/F1-predictions' style='color:#00D2BE;'>Repo</a>"
     "</div>",
     unsafe_allow_html=True,
