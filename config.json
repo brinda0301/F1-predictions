@@ -1,23 +1,23 @@
 {
   "weights": {
-    "quali_pace": 0.1946,
-    "race_pace": 0.1085,
-    "energy_score": 0.1012,
-    "sprint_score": 0.072,
-    "tyre_management": 0.0697,
-    "grid_win_rate": 0.068,
-    "practice_pace": 0.0545,
-    "reliability": 0.0497,
-    "fuel_quality": 0.0452,
-    "adaptability": 0.0331,
-    "start_score": 0.0376,
+    "quali_pace": 0.1954,
+    "race_pace": 0.109,
+    "energy_score": 0.1016,
+    "sprint_score": 0.0714,
+    "tyre_management": 0.07,
+    "grid_win_rate": 0.0683,
+    "practice_pace": 0.0542,
+    "reliability": 0.0499,
+    "fuel_quality": 0.0454,
+    "adaptability": 0.0318,
+    "start_score": 0.0378,
     "teammate_gap": 0.029,
-    "pit_execution": 0.0327,
-    "circuit_fit": 0.0245,
-    "track_temp": 0.0204,
-    "dirty_air": 0.0128,
-    "tyre_compound_fit": 0.0202,
-    "track_history": 0.0265
+    "pit_execution": 0.0328,
+    "circuit_fit": 0.0246,
+    "track_temp": 0.0205,
+    "dirty_air": 0.0129,
+    "tyre_compound_fit": 0.0203,
+    "track_history": 0.0251
   },
   "regulation_params": {
     "softmax_temperature": 0.11,
@@ -28,7 +28,7 @@
       "wet": 0.18
     }
   },
-  "last_calibrated_after_round": 8,
+  "last_calibrated_after_round": 9,
   "accuracy_history": [
     {
       "round": 1,
@@ -166,6 +166,28 @@
       "mean_position_error": 0.09,
       "xgb_winner_correct": true,
       "xgb_podium_overlap": 1
+    },
+    {
+      "round": 9,
+      "race": "Britain",
+      "predicted_winner": "Andrea Kimi Antonelli",
+      "predicted_win_pct": 48.84,
+      "actual_winner": "Charles Leclerc",
+      "correct": false,
+      "podium_predicted": [
+        "Andrea Kimi Antonelli",
+        "Lewis Hamilton",
+        "George Russell"
+      ],
+      "podium_actual": [
+        "Charles Leclerc",
+        "George Russell",
+        "Lewis Hamilton"
+      ],
+      "podium_overlap": 2,
+      "mean_position_error": 0.36,
+      "xgb_winner_correct": false,
+      "xgb_podium_overlap": 2
     }
   ]
 }
