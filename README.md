@@ -1,129 +1,36 @@
 # F1 2026 Race Predictor
  
-Self-calibrating ML model predicts F1 race winners using qualifying, practice, sprint, tyre, circuit, and weather data. Built around the 2026 FIA regulation overhaul.
+A self-calibrating ML system that predicts F1 race winners from qualifying, practice, sprint, tyre, circuit, and weather data. Every prediction is committed to GitHub before the race, timestamped and public, so the track record cannot be edited after the fact.
+ 
+**Live dashboard: [f1-predictions-bb.streamlit.app](https://f1-predictions-bb.streamlit.app/)**
  
 ## What It Does
  
-Two models run side by side:
+Two models run side by side on every race:
  
-- Monte Carlo: 100,000 simulations across 18 weighted features. Self-calibrates feature weights after each race using gradient descent.
-- XGBoost: trains on past race features and finishing positions. Re-trains from scratch each race using all completed races.
-One Streamlit dashboard. One command. Dual model comparison with agreement banner, dual podium cards, win probability charts, DNF risk, and feature importance.
+- **Monte Carlo**: 100,000 simulations across 18 weighted features. Self-calibrates its feature weights after each race using gradient descent.
+- **XGBoost**: trains on past race features and finishing positions. Re-trains from scratch each race using all completed races.
+The public dashboard shows both predictions, the actual result, a Correct or Miss badge per model, and running season accuracy.
  
-## Race Results
+## Season Track Record
  
-| Round | Race | MC Pick | XGB Pick | Actual | MC ✓ | XGB ✓ |
+| Round | Race | Monte Carlo | XGBoost | Actual | MC | XGB |
 | :---: | --- | --- | --- | --- | :---: | :---: |
-| 1 | Australian GP | Russell (59.1%) | n/a | Russell | ✅ | n/a |
-| 2 | Chinese GP | Hamilton (55.25%) | n/a | Antonelli | ❌ | n/a |
-| 3 | Japanese GP | Antonelli (40.11%) | n/a | Antonelli | ✅ | n/a |
-| 4 | Miami GP | Antonelli (19.2%) | Norris | Antonelli | ✅ | ❌ |
-| 5 | Canadian GP | Russell (41.1%) | Russell | Antonelli | ❌ | ❌ |
-| 6 | Monaco GP | Hamilton (27.16%) | Antonelli (68.9%) | Antonelli | ❌ | ✅ |
-| 7 | Barcelona-Catalunya GP | Hamilton (28.27%) | Russell (34.8%) | Hamilton | ✅ | ❌ |
-| 8 | Austrian GP | Russell (48.21%) | Russell (35.1%) | Race upcoming | — | — |
+| 1 | Australian GP | Russell (59.1%) | n/a | Russell | Correct | n/a |
+| 2 | Chinese GP | Hamilton (55.25%) | n/a | Antonelli | Miss | n/a |
+| 3 | Japanese GP | Antonelli (40.11%) | n/a | Antonelli | Correct | n/a |
+| 4 | Miami GP | Antonelli (19.2%) | Norris | Antonelli | Correct | Miss |
+| 5 | Canadian GP | Russell (41.1%) | Russell | Antonelli | Miss | Miss |
+| 6 | Monaco GP | Hamilton (27.16%) | Antonelli (68.9%) | Antonelli | Miss | Correct |
+| 7 | Barcelona-Catalunya GP | Hamilton (28.27%) | Russell (34.8%) | Hamilton | Correct | Miss |
+| 8 | Austrian GP | Russell (48.21%) | Russell (35.1%) | Russell | Correct | Correct |
+| 9 | British GP | Antonelli (48.84%) | Antonelli (57.4%) | Leclerc | Miss | Miss |
  
-Season after 7 races: Monte Carlo 4/7 winners correct (57%). XGBoost 1/4 since debut (25%).
+**After 9 races**: Monte Carlo 5/9 winners correct (56%). XGBoost 2/6 since debut (33%). Average podium drivers hit: 2.0 of 3.
  
-2026 streaks:
-- Mercedes wins: 6/7 (broken at Barcelona by Hamilton)
-- Antonelli consecutive wins: 5 (broken at Barcelona by engine failure)
-- Pole-to-win 2026: 5/7 (broken at Canada and Barcelona)
-## R8 Austria: Models Agree After 3 Races of Disagreement
+Three races this season were decided by mechanical failure, not pace: Russell's power unit at Canada, Antonelli's engine at Barcelona, Antonelli's wheel shield at Britain. No model predicts a part breaking from qualifying data.
  
-Both models pick Russell. First model agreement since R5 Canada.
- 
-- Monte Carlo: Russell 48.21%
-- XGBoost: Russell 35.1% (predicted finish 1.98)
-The disagreement moves below the winner. Monte Carlo backs Hamilton P2 (12.51%) and Verstappen P3 (8.57%) on Austria track history. Verstappen has 5 Austria wins. XGBoost backs Antonelli P2 and Leclerc P3 on grid position and recent form.
- 
-Verstappen at P5 grid with 5 Austria wins tests the track_history feature. Antonelli lost pole to a yellow flag situation in Q3. Hamilton P3 comes off his Barcelona Ferrari breakthrough win.
- 
-## Model Improvements Shipped Before R8
- 
-Two changes added before Austria to improve winner probability calibration.
- 
-### 1. DNF Discount
- 
-Winner probability now factors in DNF risk. Formula: raw_win_pct * (1 - dnf_pct/100). Then renormalize so probabilities sum to 100.
- 
-Impact at Austria:
-- Russell rose from 40.58% to 48.21% (his DNF risk is 6.07%, others are higher)
-- Drivers with mechanical concerns get downweighted
-Catches the exact failure modes that hit the model at R5 Canada (Russell DNF from lead), R6 Monaco (Verstappen lap 1 stall), and R7 Barcelona (Antonelli engine on lap 63).
- 
-### 2. Track-Dependent Softmax Temperature
- 
-The old model used one temperature (0.11) for every track. Monaco should not behave like Monza.
- 
-New per-track-type temperatures:
-- Street circuits: 0.07 (tighter, favorite gets higher probability)
-- High-speed circuits: 0.10
-- Balanced circuits: 0.12
-- Wet races: 0.18 (wider spread, more chaos)
-Austria is high_speed, so temperature drops from 0.11 to 0.10. Russell's win probability sharpens as the front-of-field favorite.
- 
-## R7 Barcelona: Hamilton's First Ferrari Win
- 
-Monte Carlo validated its track-history thesis. Pre-race odds had Hamilton at 28.27% based on his 6 Barcelona wins and 19 F1 seasons. Hamilton won by 19.561 seconds over Russell.
- 
-The story:
-- Hamilton ended his 22-month win drought (last win Belgium 2024 with Mercedes)
-- Ferrari pitted aggressively on lap 12 then lap 28, undercut Russell on the second stop
-- Antonelli was P2 with 3 laps to go after overtaking Russell, then engine failure ended his perfect run
-- Mercedes 6/6 winning streak ended
-- First all-British podium since 1968 (Hamilton, Russell, Norris)
-XGBoost predicted podium: Russell, Hamilton, Norris. Actual podium: Hamilton, Russell, Norris. XGBoost identified all 3 podium drivers but had the top 2 reversed. Strong podium accuracy, missed winner.
- 
-Championship impact: Antonelli lead cut from 66 to 41 points.
- 
-## R6 Monaco: XGBoost's First Correct Call
- 
-Antonelli won Monaco from pole. XGBoost predicted him at 68.9%. Monte Carlo backed Hamilton at 27.16% on Monaco track history. Antonelli won.
- 
-Actual podium: Antonelli, Hamilton, Gasly (reinstated to P3 after Alpine's successful appeal).
- 
-## FastF1 Integration
- 
-Added at R6 Monaco. The `fetch_race_data.py` script pulls qualifying, FP1, sprint, and previous race finishes directly from F1's official timing data.
- 
-Auto-fetched:
-- GRID with positions and Q3 times
-- FP1_TIMES from practice
-- SPRINT_RESULT (if sprint weekend)
-- TEAM_PACE_DEFICIT computed from quali times
-- DRIVER_EXPERIENCE r1_finish from previous race result.json
-Driver name normalization handles "Kimi Antonelli" to "Andrea Kimi Antonelli", "Alexander Albon" to "Alex Albon", "Oliver Bearman" to "Ollie Bearman", "Nico Hülkenberg" to "Nico Hulkenberg".
- 
-Team name normalization handles "RB F1 Team" to "Racing Bulls", "Alpine F1 Team" to "Alpine", "Cadillac F1 Team" to "Cadillac", "Kick Sauber" to "Audi".
- 
-Hand-edit after generation:
-- WEATHER forecast (no API for race-day predictions)
-- CIRCUIT type (high_speed / street / balanced)
-- TYRE_COMPOUNDS estimates
-- CIRCUIT_HISTORY veteran adjustments
-Usage:
- 
-```bash
-python fetch_race_data.py 08_austria --year 2026 --round 8 --circuit Austria
-```
- 
-## XGBoost Performance
- 
-| Round | XGBoost Pick | Actual Winner | Winner ✓ | Podium Hits |
-| :---: | --- | --- | :---: | :---: |
-| 4 | Norris | Antonelli | ❌ | 2/3 |
-| 5 | Russell | Antonelli | ❌ | 1/3 |
-| 6 | Antonelli (68.9%) | Antonelli | ✅ | 2/3 |
-| 7 | Russell (34.8%) | Hamilton | ❌ | 3/3 |
-| 8 | Russell (35.1%) | Race upcoming | — | — |
- 
-Training set growth: 66 rows (R4) to 88 (R5) to 110 (R6) to 125 (R7) to 147 (R8).
-MAE: 0.292 (R4) to 0.280 (R5) to 0.303 (R6) to 0.357 (R7) to 0.331 (R8).
- 
-MAE improved at Austria as training data grew and the model sharpened.
- 
-## 18 Features
+## The 18 Features
  
 | Feature | Category |
 | --- | --- |
@@ -136,31 +43,87 @@ MAE improved at Austria as training data grew and the model sharpened.
 | adaptability | Driver skill |
 | start_score | Race factor |
 | reliability | Race factor |
-| energy_score | 2026 reg-specific |
-| tyre_management | Tyre/pit |
-| pit_execution | Tyre/pit |
-| tyre_compound_fit | Tyre/pit |
-| fuel_quality | 2026 reg-specific |
-| dirty_air | 2026 reg-specific |
-| circuit_fit | 2026 reg-specific |
-| track_temp | 2026 reg-specific |
+| energy_score | 2026 regulation |
+| tyre_management | Tyre and pit |
+| pit_execution | Tyre and pit |
+| tyre_compound_fit | Tyre and pit |
+| fuel_quality | 2026 regulation |
+| dirty_air | 2026 regulation |
+| circuit_fit | 2026 regulation |
+| track_temp | 2026 regulation |
 | track_history | History |
  
-Weights adjust after each race based on prediction error. Learning rate decays each round so early races cause bigger shifts.
+Weights adjust after each race based on prediction error. The learning rate decays each round, so early races cause bigger shifts.
  
-## 2026 FIA Regulation Constants
+## Model Improvements Shipped
+ 
+### DNF Discount (before R8)
+ 
+Winner probability now factors in DNF risk. Raw win probability is multiplied by (1 minus DNF probability), then renormalized so all probabilities sum to 100. At Austria this raised Russell from 40.58% to 48.21% because his mechanical risk was lower than his rivals'.
+ 
+### Track-Dependent Softmax Temperature (before R8)
+ 
+The model used a single temperature (0.11) for every circuit. Monaco should not behave like Monza. New per-track-type values:
+ 
+| Track type | Temperature | Effect |
+| --- | :---: | --- |
+| Street | 0.07 | Tighter spread, favourite gets higher probability |
+| High speed | 0.10 | Moderately tight |
+| Balanced | 0.12 | Standard spread |
+| Wet | 0.18 | Wide spread, more chaos |
+ 
+## Key Race Analyses
+ 
+### R9 Britain: Both Models Wrong
+ 
+Both models picked Antonelli. He finished P16. Wheelspin at the start dropped him behind both Ferraris. He recovered to P2 on fresher hards and was closing on Leclerc at over a second per lap when a wheel shield failure broke the car. A track limits penalty finished the job.
+ 
+The real model gap this exposed was Leclerc. He qualified P2, 0.175s off pole, with the strongest race-trim Ferrari of the weekend. Both models ranked him outside the top 3 because his two recent DNFs dragged down his form scores. The model punished him for mechanical failures he did not cause. That is a feature design flaw, not bad luck. Fix queued: split driver-caused DNFs from mechanical DNFs so pace scores are not penalized for parts breaking.
+ 
+### R7 Barcelona: Monte Carlo's Track-History Thesis Validated
+ 
+Monte Carlo backed Hamilton at 28.27% based on his 6 Barcelona wins and 19 seasons of experience. He won by 19.561 seconds, his first victory for Ferrari, ending Mercedes' 6-race winning streak. XGBoost had all 3 podium drivers correct but the top 2 in the wrong order.
+ 
+### R6 Monaco: XGBoost's First Correct Call
+ 
+XGBoost predicted Antonelli at 68.9% from pole. Monte Carlo backed Hamilton at 27.16% on Monaco track history. Antonelli won. The data-driven model proved that qualifying pace dominates at street circuits where overtaking is rare.
+ 
+## FastF1 Integration
+ 
+`fetch_race_data.py` pulls qualifying, FP1, sprint results, and previous race finishes directly from F1's official timing data.
+ 
+Auto-fetched: grid with Q3 times, FP1 lap times, sprint results, team pace deficit computed from qualifying, and driver form from the previous race result.
+ 
+Name normalization handles API inconsistencies: "Kimi Antonelli" becomes "Andrea Kimi Antonelli", "Alexander Albon" becomes "Alex Albon", "RB F1 Team" becomes "Racing Bulls", "Kick Sauber" becomes "Audi".
+ 
+Hand-edited per race: weather forecast, circuit type, tyre compounds, circuit history.
+ 
+```bash
+python fetch_race_data.py 09_britain --year 2026 --round 9 --circuit British
+```
+ 
+## XGBoost Performance
+ 
+| Round | Pick | Actual | Winner | Podium Hits | Training Rows | MAE |
+| :---: | --- | --- | :---: | :---: | :---: | :---: |
+| 4 | Norris | Antonelli | Miss | 2/3 | 66 | 0.292 |
+| 5 | Russell | Antonelli | Miss | 1/3 | 88 | 0.280 |
+| 6 | Antonelli | Antonelli | Correct | 2/3 | 110 | 0.303 |
+| 7 | Russell | Hamilton | Miss | 3/3 | 125 | 0.357 |
+| 8 | Russell | Russell | Correct | 2/3 | 147 | 0.331 |
+| 9 | Antonelli | Leclerc | Miss | 2/3 | 169 | 0.336 |
+ 
+## 2026 Regulation Constants
  
 | Constant | Value | What Changed |
 | --- | :---: | --- |
 | POLE_WIN_RATE | 0.45 | Active aero replaced DRS |
-| DIRTY_AIR_RETENTION | 0.90 | Cars keep 90% downforce when following (was 70%) |
+| DIRTY_AIR_RETENTION | 0.90 | Cars keep 90% downforce when following, up from 70% |
 | OVERTAKE_BOOST | 1.4 | Overtake Mode replaces DRS |
 | ENERGY_NOISE | 0.06 | 350kW MGU-K, 50/50 power split |
-| WEIGHT_VARIANCE | 0.015 | Cars 76kg lighter (724kg) |
+| WEIGHT_VARIANCE | 0.015 | Cars 76kg lighter at 724kg |
  
 ## Setup
- 
-Requires Python 3.12, Windows or Linux.
  
 ```bash
 git clone https://github.com/brinda0301/F1-predictions.git
@@ -172,71 +135,61 @@ pip install -r requirements.txt
  
 ## Usage
  
-Fetch race data:
+Fetch race data from the FastF1 API:
  
 ```bash
-python fetch_race_data.py 08_austria --year 2026 --round 8 --circuit Austria
+python fetch_race_data.py 09_britain --year 2026 --round 9 --circuit British
 ```
  
-Hand-edit the generated data.py for CIRCUIT type, WEATHER, TYRE_COMPOUNDS, and CIRCUIT_HISTORY.
- 
-Run prediction:
+Hand-edit the generated data.py for circuit type, weather, tyre compounds, and circuit history. Then run the prediction:
  
 ```bash
-python engine.py 08_austria
+python engine.py 09_britain
 ```
  
-Launch dashboard:
+Launch the local dashboard:
  
 ```bash
 streamlit run app.py
 ```
  
-Submit result and calibrate:
+After the race, submit the result and recalibrate:
  
 ```bash
-python -c "from engine import calibrate; calibrate(8)"
+python -c "from engine import calibrate; calibrate(9)"
 ```
  
-## File Structure
+## Project Structure
  
 ```
-f1-gp-predictor/
-├── engine.py              # Monte Carlo + XGBoost + calibration
-├── app.py                 # Streamlit dashboard
-├── fetch_race_data.py     # FastF1 data fetcher
-├── config.json            # weights, accuracy history, regulation params
+F1-predictions/
+├── engine.py              Monte Carlo + XGBoost + self-calibration
+├── app.py                 Local dashboard, runs predictions
+├── app_public.py          Public read-only dashboard, deployed to Streamlit Cloud
+├── fetch_race_data.py     FastF1 data pipeline
+├── config.json            Feature weights, accuracy history, regulation params
 ├── requirements.txt
-├── .fastf1_cache/
 └── races/
-    ├── 01_australia/
-    ├── 02_china/
-    ├── 03_japan/
-    ├── 04_miami/
-    ├── 05_canada/
-    ├── 06_monaco/
-    ├── 07_barcelona/
-    └── 08_austria/
-        ├── data.py
-        └── prediction.json
+    ├── 01_australia/ ... 09_britain/
+    │   ├── data.py         Race inputs
+    │   ├── prediction.json Locked before the race
+    │   └── result.json     Actual outcome
 ```
  
 ## Tech Stack
  
-- Python 3.12
-- NumPy (Monte Carlo simulations)
-- XGBoost + scikit-learn
-- FastF1 (official F1 timing data)
-- Streamlit (dashboard)
-- Plotly (charts)
-## What Comes Next
+Python 3.12, NumPy, XGBoost, scikit-learn, FastF1, Streamlit, Plotly.
  
-R9: British GP, July 3 to 5, 2026, Silverstone.
+Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live dashboard automatically.
  
-Backlog priorities before R9:
-- Recent DNF rate per driver over last 5 races (currently static per team)
-- Brier score logging after each race for probability calibration tracking
-XGBoost training set grows to ~168 rows after R8.
+## Roadmap
+ 
+- **Backtest harness**: replay the model against 2024 and 2025 seasons to validate across 60-plus races instead of 9
+- **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
+- **Brier score logging**: track probability calibration quality with a single number after each race
+- **XGBoost accuracy history**: log XGBoost results to config so the season chart shows both models
+Next race: Belgian GP, Spa-Francorchamps, July 17 to 19, 2026.
+ 
 ---
 
 Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/marianaantaya/).
