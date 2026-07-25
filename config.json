@@ -1,23 +1,23 @@
 {
   "weights": {
-    "quali_pace": 0.1954,
-    "race_pace": 0.109,
-    "energy_score": 0.1016,
-    "sprint_score": 0.0714,
+    "quali_pace": 0.2014,
+    "race_pace": 0.1106,
+    "energy_score": 0.1031,
+    "sprint_score": 0.075,
     "tyre_management": 0.07,
-    "grid_win_rate": 0.0683,
-    "practice_pace": 0.0542,
-    "reliability": 0.0499,
-    "fuel_quality": 0.0454,
-    "adaptability": 0.0318,
-    "start_score": 0.0378,
-    "teammate_gap": 0.029,
-    "pit_execution": 0.0328,
-    "circuit_fit": 0.0246,
-    "track_temp": 0.0205,
-    "dirty_air": 0.0129,
-    "tyre_compound_fit": 0.0203,
-    "track_history": 0.0251
+    "grid_win_rate": 0.0717,
+    "practice_pace": 0.0535,
+    "reliability": 0.0484,
+    "fuel_quality": 0.044,
+    "adaptability": 0.0309,
+    "start_score": 0.0389,
+    "teammate_gap": 0.0289,
+    "pit_execution": 0.031,
+    "circuit_fit": 0.0222,
+    "track_temp": 0.0178,
+    "dirty_air": 0.0105,
+    "tyre_compound_fit": 0.0178,
+    "track_history": 0.0244
   },
   "regulation_params": {
     "softmax_temperature": 0.11,
@@ -28,7 +28,7 @@
       "wet": 0.18
     }
   },
-  "last_calibrated_after_round": 9,
+  "last_calibrated_after_round": 10,
   "accuracy_history": [
     {
       "round": 1,
@@ -188,6 +188,28 @@
       "mean_position_error": 0.36,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 2
+    },
+    {
+      "round": 10,
+      "race": "Belgium",
+      "predicted_winner": "Andrea Kimi Antonelli",
+      "predicted_win_pct": 34.45,
+      "actual_winner": "Andrea Kimi Antonelli",
+      "correct": true,
+      "podium_predicted": [
+        "Andrea Kimi Antonelli",
+        "Max Verstappen",
+        "Lewis Hamilton"
+      ],
+      "podium_actual": [
+        "Andrea Kimi Antonelli",
+        "Charles Leclerc",
+        "Max Verstappen"
+      ],
+      "podium_overlap": 2,
+      "mean_position_error": 0.36,
+      "xgb_winner_correct": false,
+      "xgb_podium_overlap": 3
     }
   ]
 }
