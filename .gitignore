@@ -29,5 +29,6 @@ Thumbs.db
 
 # FastF1 cache
 data/f1_cache/
+.fastf1_cache/
 
 __pycache__/

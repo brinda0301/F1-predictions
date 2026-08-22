@@ -25,10 +25,13 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
 | 7 | Barcelona-Catalunya GP | Hamilton (28.27%) | Russell (34.8%) | Hamilton | Correct | Miss |
 | 8 | Austrian GP | Russell (48.21%) | Russell (35.1%) | Russell | Correct | Correct |
 | 9 | British GP | Antonelli (48.84%) | Antonelli (57.4%) | Leclerc | Miss | Miss |
+| 10 | Belgian GP | Antonelli (34.45%) | Verstappen (44.18%) | Antonelli | Correct | Miss |
+| 11 | Hungarian GP | Hamilton (29.82%) | Hamilton | Norris | Miss | Miss |
+| 12 | Dutch GP | Norris (36.0%) | Norris (42.69%) | pending | pending | pending |
  
-**After 9 races**: Monte Carlo 5/9 winners correct (56%). XGBoost 2/6 since debut (33%). Average podium drivers hit: 2.0 of 3.
+**After 11 scored races**: Monte Carlo 6/11 winners correct (55%). XGBoost 2/8 since debut (25%). Average podium drivers hit: 1.9 of 3.
  
-Three races this season were decided by mechanical failure, not pace: Russell's power unit at Canada, Antonelli's engine at Barcelona, Antonelli's wheel shield at Britain. No model predicts a part breaking from qualifying data.
+Four races this season were decided by mechanical failure, not pace: Russell's power unit at Canada, Antonelli's engine at Barcelona, Antonelli's wheel shield at Britain, Russell's retirement at Belgium. No model predicts a part breaking from qualifying data.
  
 ## The 18 Features
  
@@ -74,6 +77,14 @@ The model used a single temperature (0.11) for every circuit. Monaco should not 
  
 ## Key Race Analyses
  
+### R11 Hungary: Both Models Missed the Pole Sitter
+
+Both models picked Hamilton from P5 after a three-place impeding penalty. He finished P5. Norris won from pole, and Monte Carlo had him second at 22.57%, XGBoost fourth.
+
+The model leaned on Hamilton's eight Hungaroring wins through `track_history`, weighted 0.0244. Testing the penalty in isolation showed why that was the wrong read: dropping Hamilton three places moved his win probability from 32.45% to 30.3%. A three-place drop at a circuit where nobody overtakes cost him two points of probability. `quali_pace` carries 0.2014 and reads lap time, which a penalty never changes, while `grid_win_rate` carries 0.0717 and is the only feature reading grid position. Roughly seven percent of the feature mass moves when a penalty lands.
+
+That is defensible at Spa. At the Hungaroring it is close to blind. Fix queued: make grid weighting track-dependent, the way softmax temperature already is.
+
 ### R9 Britain: Both Models Wrong
  
 Both models picked Antonelli. He finished P16. Wheelspin at the start dropped him behind both Ferraris. He recovered to P2 on fresher hards and was closing on Leclerc at over a second per lap when a wheel shield failure broke the car. A track limits penalty finished the job.
@@ -88,20 +99,34 @@ Monte Carlo backed Hamilton at 28.27% based on his 6 Barcelona wins and 19 seaso
  
 XGBoost predicted Antonelli at 68.9% from pole. Monte Carlo backed Hamilton at 27.16% on Monaco track history. Antonelli won. The data-driven model proved that qualifying pace dominates at street circuits where overtaking is rare.
  
-## FastF1 Integration
- 
-`fetch_race_data.py` pulls qualifying, FP1, sprint results, and previous race finishes directly from F1's official timing data.
- 
-Auto-fetched: grid with Q3 times, FP1 lap times, sprint results, team pace deficit computed from qualifying, and driver form from the previous race result.
- 
-Name normalization handles API inconsistencies: "Kimi Antonelli" becomes "Andrea Kimi Antonelli", "Alexander Albon" becomes "Alex Albon", "RB F1 Team" becomes "Racing Bulls", "Kick Sauber" becomes "Audi".
- 
-Hand-edited per race: weather forecast, circuit type, tyre compounds, circuit history.
- 
+## Data Pipeline
+
+`fetch_race_data.py` builds race files from the Ergast-compatible timing API at `api.jolpi.ca`. The earlier version read FastF1 only, which pulls fresh sessions from `livetiming.formula1.com`. That host blocks many networks and lags for hours after a session ends, so a Saturday-evening prediction could not be built on it. The API serves qualifying, sprint and race classifications from anywhere within an hour or two. FastF1 is now optional and supplies FP1 times alone, which no public API exposes.
+
+Auto-fetched: grid with qualifying times, sprint results, team pace deficit computed from qualifying, driver form from the previous race result, and the sprint-weekend flag.
+
+Grid penalties apply from the command line rather than by hand editing. Non-penalised drivers keep relative order and fill from the front, then each penalised driver takes their target slot, matching how the FIA forms a grid when several penalties land at once.
+
 ```bash
-python fetch_race_data.py 09_britain --year 2026 --round 9 --circuit British
+python fetch_race_data.py 11_hungary --round 11 \
+    --penalty "Lewis Hamilton:3" --penalty "Andrea Kimi Antonelli:3" \
+    --pitlane "Sergio Perez"
 ```
- 
+
+Results and scoring run in one command. This writes `result.json` and appends the round to `accuracy_history`.
+
+```bash
+python fetch_race_data.py 11_hungary --round 11 --result --score
+```
+
+Name normalization keys on stable API ids rather than display names, which drift: `rb` resolves to Racing Bulls whether the API calls it "RB F1 Team" or "Racing Bulls". FastF1 driver names are reconciled against the grid by surname, so "Kimi Antonelli" maps to "Andrea Kimi Antonelli", "Oliver Bearman" to "Ollie Bearman", "Alexander Albon" to "Alex Albon".
+
+That reconciliation matters more than it looks. The engine reads FP1 by grid name and assigns `practice_pace` 0.3 to any name it cannot find. Before the fix, three drivers at Zandvoort silently sat on that fallback, including Antonelli, who had topped the session. His win probability read 4.57% instead of 9.42%, and he dropped off the predicted podium. Nothing errored. The only trace was a suspiciously round number in the feature dump.
+
+FP1 is written all-or-nothing for the same reason: if under 80 percent of the grid matches, the table is left empty so every driver gets the same neutral value.
+
+Hand-edited per race: weather forecast, circuit type, tyre compounds, circuit history. These carry over from the previous `data.py`, so a re-fetch no longer wipes tuning.
+
 ## XGBoost Performance
  
 | Round | Pick | Actual | Winner | Podium Hits | Training Rows | MAE |
@@ -112,6 +137,9 @@ python fetch_race_data.py 09_britain --year 2026 --round 9 --circuit British
 | 7 | Russell | Hamilton | Miss | 3/3 | 125 | 0.357 |
 | 8 | Russell | Russell | Correct | 2/3 | 147 | 0.331 |
 | 9 | Antonelli | Leclerc | Miss | 2/3 | 169 | 0.336 |
+| 10 | Verstappen | Antonelli | Miss | 3/3 | 191 | 0.321 |
+| 11 | Hamilton | Norris | Miss | 1/3 | 213 | 0.316 |
+| 12 | Norris | pending | pending | pending | 235 | 0.396 |
  
 ## 2026 Regulation Constants
  
@@ -134,31 +162,31 @@ pip install -r requirements.txt
 ```
  
 ## Usage
- 
-Fetch race data from the FastF1 API:
- 
+
+Build the race file. The folder is created automatically.
+
 ```bash
-python fetch_race_data.py 09_britain --year 2026 --round 9 --circuit British
+python fetch_race_data.py 12_netherlands --round 12
 ```
- 
-Hand-edit the generated data.py for circuit type, weather, tyre compounds, and circuit history. Then run the prediction:
- 
+
+Set the weather forecast and circuit history in the generated `data.py`, then run the prediction:
+
 ```bash
-python engine.py 09_britain
+python engine.py 12_netherlands
 ```
- 
+
 Launch the local dashboard:
- 
+
 ```bash
 streamlit run app.py
 ```
- 
-After the race, submit the result and recalibrate:
- 
+
+After the race, write the result and score the round:
+
 ```bash
-python -c "from engine import calibrate; calibrate(9)"
+python fetch_race_data.py 12_netherlands --round 12 --result --score
 ```
- 
+
 ## Project Structure
  
 ```
@@ -166,11 +194,11 @@ F1-predictions/
 ├── engine.py              Monte Carlo + XGBoost + self-calibration
 ├── app.py                 Local dashboard, runs predictions
 ├── app_public.py          Public read-only dashboard, deployed to Streamlit Cloud
-├── fetch_race_data.py     FastF1 data pipeline
+├── fetch_race_data.py     Timing API pipeline: grid, sprint, penalties, results, scoring
 ├── config.json            Feature weights, accuracy history, regulation params
 ├── requirements.txt
 └── races/
-    ├── 01_australia/ ... 09_britain/
+    ├── 01_australia/ ... 12_netherlands/
     │   ├── data.py         Race inputs
     │   ├── prediction.json Locked before the race
     │   └── result.json     Actual outcome
@@ -178,7 +206,7 @@ F1-predictions/
  
 ## Tech Stack
  
-Python 3.12, NumPy, XGBoost, scikit-learn, FastF1, Streamlit, Plotly.
+Python 3.12, NumPy, XGBoost, scikit-learn, FastF1, Streamlit, Plotly. Race data from the Ergast-compatible API at api.jolpi.ca.
  
 Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live dashboard automatically.
  
@@ -188,8 +216,10 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
 - **Brier score logging**: track probability calibration quality with a single number after each race
 - **XGBoost accuracy history**: log XGBoost results to config so the season chart shows both models
-Next race: Belgian GP, Spa-Francorchamps, July 17 to 19, 2026.
+- **Track-dependent grid weighting**: `grid_win_rate` carries the same weight at Monaco and Monza. Circuits where overtaking is rare should weight starting position far higher
+- **Ensemble layer**: across recent races XGBoost identifies podium drivers while ordering them wrong, and Monte Carlo orders better than it selects. Let XGBoost pick the podium set and Monte Carlo rank it
+- **Dead XGBoost features**: at R12 the model assigned `race_pace` and `tyre_management` zero importance, while `tyre_compound_fit` and `energy_score` together carried 51%. With 235 rows at max_depth 3, that concentration needs investigating before more features are added
+Next race: Italian GP, Monza, September 4 to 6, 2026.
  
 ---
-
 Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/marianaantaya/).

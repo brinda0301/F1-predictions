@@ -1,399 +1,605 @@
 """
 fetch_race_data.py
 
-Pulls qualifying, practice, and sprint data from FastF1 and generates
-a data.py file in your engine's schema. Run this after qualifying ends.
+Builds race data files for the prediction engine straight from the official
+timing API. Replaces the FastF1-only version.
 
-Usage from PowerShell (in your repo root):
-    python fetch_race_data.py 06_monaco --year 2026 --round 8 --circuit Monaco
+Why the rewrite:
+  FastF1 reads fresh sessions from livetiming.formula1.com, which blocks many
+  hosts and lags for hours after a session ends. The Ergast-compatible API at
+  api.jolpi.ca serves qualifying, sprint and race classifications from anywhere,
+  usually within an hour or two of a session. FastF1 is now optional and used
+  only for FP1 times, which no public API exposes.
 
-The --round and --circuit args use F1's official numbering. FastF1 needs them
-to fetch the right session. The 06_monaco arg is your local folder name.
+Three modes:
 
-What the script auto-fetches:
-    GRID                 from qualifying classification
-    FP1_TIMES           from FP1 session
-    SPRINT_RESULT       from sprint race (if sprint weekend)
-    TEAM_PACE_DEFICIT   computed from quali times
-    DRIVER_EXPERIENCE   r1_finish read from previous race result.json
-    CIRCUIT             length and laps from session info
+  Build a data.py for an upcoming race
+      python fetch_race_data.py 12_netherlands --round 12
 
-What you still hand-edit after the script runs:
-    WEATHER             race day forecast (FastF1 has session weather, not forecasts)
-    CIRCUIT_HISTORY     past results at this circuit (FastF1 has it, but adding logic later)
-    TYRE_COMPOUNDS      compound choice and strategy estimates
-    START_PROCEDURE     per-team launch quality (your domain knowledge)
-    ENERGY_READINESS    per-team 2026 hybrid management estimates
+  Apply grid penalties without hand editing
+      python fetch_race_data.py 11_hungary --round 11 \
+          --penalty "Lewis Hamilton:3" --penalty "Andrea Kimi Antonelli:3" \
+          --pitlane "Sergio Perez"
 
-The script leaves these fields with sensible defaults you can review.
+  Write result.json for a finished race and score it into config.json
+      python fetch_race_data.py 11_hungary --round 11 --result --score
+
+Hand-edit fields (WEATHER, CIRCUIT, TYRE_COMPOUNDS, CIRCUIT_HISTORY,
+START_PROCEDURE, ENERGY_READINESS) are carried over from an existing data.py
+when one is present, so a re-fetch no longer wipes your tuning.
 """
 
-from __future__ import annotations
 import argparse
 import json
-import os
+import re
 import sys
+import urllib.request
 from pathlib import Path
 
-try:
-    import fastf1
-    from fastf1.core import DataNotLoadedError
-except ImportError:
-    print("FastF1 not installed. Run: pip install fastf1")
-    sys.exit(1)
+API = "https://api.jolpi.ca/ergast/f1"
 
-
-# Map FastF1 team names to your engine's team names.
-# Update this dict when F1 team names change between seasons.
-TEAM_NAME_MAP = {
-    "Mercedes":             "Mercedes",
-    "Red Bull Racing":      "Red Bull",
-    "Red Bull":             "Red Bull",
-    "Ferrari":              "Ferrari",
-    "McLaren":              "McLaren",
-    "Alpine":               "Alpine",
-    "Racing Bulls":         "Racing Bulls",
-    "RB":                   "Racing Bulls",     # 2025 naming
-    "Visa Cash App RB":     "Racing Bulls",
-    "Aston Martin":         "Aston Martin",
-    "Williams":             "Williams",
-    "Audi":                 "Audi",
-    "Sauber":               "Audi",              # 2025 -> Audi rebrand
-    "Kick Sauber":          "Audi",
-    "Stake F1 Team Kick Sauber": "Audi",
-    "Haas F1 Team":         "Haas",
-    "Haas":                 "Haas",
-    "Cadillac":             "Cadillac",
+# Stable API ids mapped to the names used across the repo. Keyed by id, not by
+# display name, because the API's display names drift ("RB F1 Team" vs "Racing
+# Bulls") while ids do not.
+TEAMS = {
+    "mclaren": "McLaren",
+    "mercedes": "Mercedes",
+    "ferrari": "Ferrari",
+    "red_bull": "Red Bull",
+    "rb": "Racing Bulls",
+    "audi": "Audi",
+    "alpine": "Alpine",
+    "haas": "Haas",
+    "williams": "Williams",
+    "aston_martin": "Aston Martin",
+    "cadillac": "Cadillac",
 }
 
-# Map FastF1 driver names to the exact names your past data.py files use.
-# Critical because XGBoost training links drivers by name across races.
-# Add entries here whenever you spot a mismatch.
-DRIVER_NAME_MAP = {
-    "Kimi Antonelli":      "Andrea Kimi Antonelli",
-    "Alexander Albon":     "Alex Albon",
-    "Oliver Bearman":      "Ollie Bearman",
-    "Nico Hülkenberg":     "Nico Hulkenberg",
-    "Sergio Pérez":        "Sergio Perez",
-    # The rest pass through unchanged
+DRIVERS = {
+    "norris": "Lando Norris",
+    "piastri": "Oscar Piastri",
+    "russell": "George Russell",
+    "antonelli": "Andrea Kimi Antonelli",
+    "hamilton": "Lewis Hamilton",
+    "leclerc": "Charles Leclerc",
+    "max_verstappen": "Max Verstappen",
+    "verstappen": "Max Verstappen",
+    "hadjar": "Isack Hadjar",
+    "lawson": "Liam Lawson",
+    "arvid_lindblad": "Arvid Lindblad",
+    "tsunoda": "Yuki Tsunoda",
+    "hulkenberg": "Nico Hulkenberg",
+    "bortoleto": "Gabriel Bortoleto",
+    "gasly": "Pierre Gasly",
+    "colapinto": "Franco Colapinto",
+    "ocon": "Esteban Ocon",
+    "bearman": "Ollie Bearman",
+    "albon": "Alex Albon",
+    "sainz": "Carlos Sainz",
+    "alonso": "Fernando Alonso",
+    "stroll": "Lance Stroll",
+    "bottas": "Valtteri Bottas",
+    "perez": "Sergio Perez",
 }
 
+SEASONS = {
+    "Andrea Kimi Antonelli": 2, "George Russell": 7, "Lewis Hamilton": 19,
+    "Max Verstappen": 11, "Charles Leclerc": 8, "Lando Norris": 7,
+    "Oscar Piastri": 4, "Isack Hadjar": 2, "Pierre Gasly": 9,
+    "Franco Colapinto": 2, "Carlos Sainz": 11, "Alex Albon": 6,
+    "Liam Lawson": 2, "Arvid Lindblad": 0, "Ollie Bearman": 2,
+    "Esteban Ocon": 9, "Nico Hulkenberg": 14, "Gabriel Bortoleto": 2,
+    "Fernando Alonso": 23, "Lance Stroll": 9, "Valtteri Bottas": 13,
+    "Sergio Perez": 15, "Yuki Tsunoda": 6,
+}
 
-def normalise_driver(name: str) -> str:
-    """Convert FastF1's driver name to your engine's naming."""
-    return DRIVER_NAME_MAP.get(name, name)
+DEFAULT_START_PROCEDURE = {
+    "Mercedes": 0.00, "Ferrari": 0.05, "McLaren": 0.05, "Red Bull": 0.00,
+    "Alpine": 0.00, "Racing Bulls": 0.00, "Audi": -0.02, "Haas": 0.02,
+    "Williams": -0.02, "Aston Martin": -0.05, "Cadillac": -0.08,
+}
 
+DEFAULT_ENERGY_READINESS = {
+    "Mercedes": 0.88, "McLaren": 0.85, "Ferrari": 0.80, "Red Bull": 0.78,
+    "Racing Bulls": 0.70, "Alpine": 0.60, "Williams": 0.62, "Haas": 0.58,
+    "Audi": 0.50, "Aston Martin": 0.45, "Cadillac": 0.40,
+}
 
-def setup_cache():
-    """Create a local cache folder for FastF1. Speeds up repeat queries."""
-    cache_dir = Path(".fastf1_cache")
-    cache_dir.mkdir(exist_ok=True)
-    fastf1.Cache.enable_cache(str(cache_dir))
-
-
-def normalise_team(team_name: str) -> str:
-    """Convert FastF1's team name to your engine's team naming."""
-    return TEAM_NAME_MAP.get(team_name, team_name)
-
-
-def fetch_grid(year: int, gp: str) -> list[dict]:
-    """Fetch qualifying results and return GRID in engine schema."""
-    session = fastf1.get_session(year, gp, "Q")
-    session.load()
-    results = session.results.sort_values("Position")
-
-    grid = []
-    for _, row in results.iterrows():
-        # Use the best Q3 time, fall back to Q2, then Q1.
-        q_time = None
-        for col in ["Q3", "Q2", "Q1"]:
-            if col in row and not _is_null_time(row[col]):
-                q_time = _time_to_seconds(row[col])
-                break
-        # Status DSQ means quali time is invalid (the Hadjar Miami bug).
-        if row.get("Status") and "Disqualified" in str(row["Status"]):
-            q_time = None
-
-        grid.append({
-            "driver": normalise_driver(str(row["FullName"])),
-            "team": normalise_team(str(row["TeamName"])),
-            "pos": int(row["Position"]),
-            "q_time": q_time,
-        })
-    return grid
+CARRY_OVER = [
+    "START_PROCEDURE", "ENERGY_READINESS", "CIRCUIT",
+    "TYRE_COMPOUNDS", "WEATHER", "CIRCUIT_HISTORY",
+]
 
 
-def fetch_fp1_times(year: int, gp: str) -> dict:
-    """Fetch FP1 fastest lap per driver."""
+# ---------------------------------------------------------------- API helpers
+
+def api(path):
+    """GET a jolpica endpoint and return the MRData payload."""
+    url = f"{API}/{path.lstrip('/')}"
+    sep = "&" if "?" in url else "?"
+    url = f"{url}{sep}format=json&limit=100"
     try:
-        session = fastf1.get_session(year, gp, "FP1")
-        session.load()
-    except DataNotLoadedError:
-        print("FP1 data not available. Skipping FP1_TIMES.")
-        return {}
-
-    fp1_times = {}
-    for driver_code in session.drivers:
-        try:
-            driver_laps = session.laps.pick_drivers(driver_code)
-            fastest = driver_laps.pick_fastest()
-            if fastest is not None and fastest["LapTime"] is not None:
-                # Match the same FullName key used in GRID for consistency.
-                driver_info = session.get_driver(driver_code)
-                full_name = normalise_driver(f"{driver_info['FirstName']} {driver_info['LastName']}")
-                fp1_times[full_name] = _time_to_seconds(fastest["LapTime"])
-        except Exception:
-            continue
-    return fp1_times
+        with urllib.request.urlopen(url, timeout=30) as r:
+            return json.load(r)["MRData"]
+    except Exception as exc:
+        sys.exit(f"API request failed: {url}\n  {exc}")
 
 
-def fetch_sprint_result(year: int, gp: str) -> list[dict]:
-    """Fetch sprint race result if this is a sprint weekend. Empty list otherwise."""
-    try:
-        session = fastf1.get_session(year, gp, "S")
-        session.load()
-    except (DataNotLoadedError, ValueError, KeyError):
-        return []  # Not a sprint weekend
+def driver_name(d):
+    return DRIVERS.get(d["driverId"], f"{d['givenName']} {d['familyName']}")
 
-    results = session.results.sort_values("Position")
-    sprint = []
-    for _, row in results.iterrows():
-        sprint.append({
-            "driver": normalise_driver(str(row["FullName"])),
-            "pos": int(row["Position"]),
+
+def team_name(c):
+    return TEAMS.get(c["constructorId"], c["name"])
+
+
+def to_seconds(clock):
+    """'1:11.163' -> 71.163. Returns None for blanks."""
+    if not clock:
+        return None
+    m = re.match(r"^(?:(\d+):)?(\d+)\.(\d+)$", clock.strip())
+    if not m:
+        return None
+    minutes = int(m.group(1) or 0)
+    return round(minutes * 60 + int(m.group(2)) + int(m.group(3)) / 1000, 3)
+
+
+def best_lap(entry):
+    for key in ("Q3", "Q2", "Q1"):
+        secs = to_seconds(entry.get(key))
+        if secs is not None:
+            return secs
+    return None
+
+
+# ---------------------------------------------------------------- API fetches
+
+def fetch_qualifying(year, rnd):
+    races = api(f"{year}/{rnd}/qualifying/")["RaceTable"]["Races"]
+    if not races:
+        sys.exit(
+            f"No qualifying data for {year} round {rnd} yet.\n"
+            "The API usually publishes within a couple of hours of the session."
+        )
+    out = []
+    for q in races[0]["QualifyingResults"]:
+        out.append({
+            "driver": driver_name(q["Driver"]),
+            "team": team_name(q["Constructor"]),
+            "pos": int(q["position"]),
+            "q_time": best_lap(q),
         })
-    return sprint
+    out.sort(key=lambda x: x["pos"])
+    return races[0], out
 
 
-def compute_team_pace_deficit(grid: list[dict]) -> dict:
-    """Each team's fastest quali time, normalised to fastest team = 0.0."""
-    team_best = {}
-    for entry in grid:
-        if entry["q_time"] is None:
-            continue
-        team = entry["team"]
-        if team not in team_best or entry["q_time"] < team_best[team]:
-            team_best[team] = entry["q_time"]
-
-    if not team_best:
-        return {}
-    fastest = min(team_best.values())
-    return {team: round(t - fastest, 3) for team, t in team_best.items()}
-
-
-def fetch_previous_race_finishes(races_dir: Path, current_round: int) -> dict:
-    """Read the previous round's result.json to populate r1_finish."""
-    prev_round = current_round - 1
-    if prev_round < 1:
-        return {}
-    # Find the folder matching prev_round
-    for folder in races_dir.iterdir():
-        if folder.is_dir() and folder.name.startswith(f"{prev_round:02d}_"):
-            result_path = folder / "result.json"
-            if result_path.exists():
-                with open(result_path) as f:
-                    data = json.load(f)
-                return {r["driver"]: r.get("pos") for r in data["result"]}
-    return {}
-
-
-def _time_to_seconds(td) -> float:
-    """Convert pandas Timedelta or datetime.timedelta to seconds."""
-    if hasattr(td, "total_seconds"):
-        return round(td.total_seconds(), 3)
-    return float(td)
-
-
-def _is_null_time(val) -> bool:
-    """Check if a quali time value is null/NaT."""
-    if val is None:
-        return True
-    if hasattr(val, "isna") and val.isna():
-        return True
-    s = str(val).lower()
-    return s in ("nat", "nan", "", "none")
-
-
-def write_data_py(
-    output_path: Path,
-    race_name: str,
-    round_num: int,
-    grid: list[dict],
-    fp1_times: dict,
-    sprint_result: list[dict],
-    team_pace_deficit: dict,
-    prev_finishes: dict,
-    is_sprint_weekend: bool,
-):
-    """Write the full data.py file using the schema engine.py expects."""
-
-    # Build DRIVER_EXPERIENCE from previous race + a season-count lookup.
-    # f1_seasons is not in FastF1, so we default. User can edit.
-    SEASONS = {
-        "Andrea Kimi Antonelli": 2, "George Russell": 7, "Lewis Hamilton": 19,
-        "Max Verstappen": 11, "Charles Leclerc": 8, "Lando Norris": 7,
-        "Oscar Piastri": 4, "Isack Hadjar": 2, "Pierre Gasly": 9,
-        "Franco Colapinto": 2, "Carlos Sainz": 11, "Alex Albon": 6,
-        "Liam Lawson": 2, "Arvid Lindblad": 0, "Ollie Bearman": 2,
-        "Esteban Ocon": 9, "Nico Hulkenberg": 14, "Gabriel Bortoleto": 2,
-        "Fernando Alonso": 23, "Lance Stroll": 9, "Valtteri Bottas": 13,
-        "Sergio Perez": 15,
-    }
-    driver_experience = {}
-    for entry in grid:
-        d = entry["driver"]
-        driver_experience[d] = {
-            "f1_seasons": SEASONS.get(d, 5),
-            "r1_finish": prev_finishes.get(d),
+def fetch_sprint(year, rnd):
+    races = api(f"{year}/{rnd}/sprint/")["RaceTable"]["Races"]
+    if not races:
+        return []
+    return [
+        {
+            "pos": int(s["position"]),
+            "driver": driver_name(s["Driver"]),
+            "team": team_name(s["Constructor"]),
         }
-
-    # Defaults for fields FastF1 can't provide. User edits after generation.
-    DEFAULT_START_PROCEDURE = {
-        "Mercedes": 0.00, "Ferrari": 0.05, "McLaren": 0.05, "Red Bull": 0.00,
-        "Alpine": 0.00, "Racing Bulls": 0.00, "Audi": -0.02, "Haas": 0.02,
-        "Williams": -0.02, "Aston Martin": -0.05, "Cadillac": -0.08,
-    }
-    DEFAULT_ENERGY_READINESS = {
-        "Mercedes": 0.88, "McLaren": 0.85, "Ferrari": 0.80, "Red Bull": 0.78,
-        "Racing Bulls": 0.70, "Alpine": 0.60, "Williams": 0.62, "Haas": 0.58,
-        "Audi": 0.50, "Aston Martin": 0.45, "Cadillac": 0.40,
-    }
-
-    lines = []
-    lines.append('"""')
-    lines.append(f"R{round_num}: {race_name} 2026")
-    lines.append("Auto-generated by fetch_race_data.py. Hand-edit WEATHER and CIRCUIT below.")
-    lines.append('"""')
-    lines.append("")
-    lines.append(f"RACE_INFO = {json_compact({'name': race_name + ' Grand Prix', 'circuit': race_name, 'date': '', 'round': round_num, 'is_sprint_weekend': is_sprint_weekend})}")
-    lines.append("")
-
-    lines.append("GRID = [")
-    for entry in grid:
-        lines.append(f"    {json_compact(entry)},")
-    lines.append("]")
-    lines.append("")
-
-    lines.append("FP1_TIMES = {")
-    for d, t in fp1_times.items():
-        lines.append(f"    {json.dumps(d)}: {t},")
-    lines.append("}")
-    lines.append("")
-
-    if sprint_result:
-        lines.append("SPRINT_RESULT = [")
-        for entry in sprint_result:
-            lines.append(f"    {json_compact(entry)},")
-        lines.append("]")
-    else:
-        lines.append("SPRINT_RESULT = []")
-    lines.append("")
-
-    lines.append("DRIVER_EXPERIENCE = {")
-    for d, info in driver_experience.items():
-        lines.append(f"    {json.dumps(d)}: {json_compact(info)},")
-    lines.append("}")
-    lines.append("")
-
-    lines.append("TEAM_PACE_DEFICIT = {")
-    for team, deficit in sorted(team_pace_deficit.items(), key=lambda x: x[1]):
-        lines.append(f"    {json.dumps(team)}: {deficit},")
-    lines.append("}")
-    lines.append("")
-
-    lines.append("# Edit per race based on team form. Defaults shown.")
-    lines.append(f"START_PROCEDURE = {json_compact(DEFAULT_START_PROCEDURE)}")
-    lines.append("")
-
-    lines.append(f"ENERGY_READINESS = {json_compact(DEFAULT_ENERGY_READINESS)}")
-    lines.append("")
-
-    lines.append("# Edit per race with track-specific veteran advantages.")
-    lines.append("CIRCUIT_HISTORY = {}")
-    lines.append("")
-
-    lines.append("# Edit per race. type is 'high_speed' / 'street' / 'balanced'.")
-    lines.append('CIRCUIT = {"type": "balanced", "pit_loss_seconds": 22}')
-    lines.append("")
-
-    lines.append("# hardness: 0=softest, 1=hardest. one_stop_probability: 0-1.")
-    lines.append('TYRE_COMPOUNDS = {"hardness": 0.5, "one_stop_probability": 0.65}')
-    lines.append("")
-
-    lines.append("# IMPORTANT: Replace with the race day forecast before running prediction.")
-    lines.append('WEATHER = {"track_temp_c": 30, "rain_probability": 0.10}')
-    lines.append("")
-
-    output_path.write_text("\n".join(lines), encoding="utf-8")
+        for s in races[0]["SprintResults"]
+    ]
 
 
-def json_compact(obj) -> str:
-    """JSON dump with no trailing newline, suitable for inline embedding.
+def fetch_results(year, rnd):
+    races = api(f"{year}/{rnd}/results/")["RaceTable"]["Races"]
+    if not races:
+        return []
+    out = []
+    for r in races[0]["Results"]:
+        status = r["status"]
+        if status == "Finished":
+            clean = "Finished"
+        elif "Lap" in status:
+            clean = "Lapped"
+        else:
+            clean = "Retired"
+        out.append({
+            "pos": int(r["position"]),
+            "driver": driver_name(r["Driver"]),
+            "team": team_name(r["Constructor"]),
+            "status": clean,
+        })
+    out.sort(key=lambda x: x["pos"])
+    return out
 
-    JSON writes booleans as true/false, which are not valid Python names.
-    The generated data.py would raise NameError on import, so convert them.
+
+def reconcile_name(raw, grid_names):
+    """Map a FastF1 driver name onto the name used in GRID.
+
+    FastF1 and the timing API disagree on several drivers: 'Kimi Antonelli' vs
+    'Andrea Kimi Antonelli', 'Oliver Bearman' vs 'Ollie Bearman', 'Alexander
+    Albon' vs 'Alex Albon'. The engine looks FP1 up by the GRID name, so an
+    unreconciled key silently drops that driver to practice_pace 0.3.
     """
-    s = json.dumps(obj, ensure_ascii=False)
-    return s.replace(": true", ": True").replace(": false", ": False")
+    if raw in grid_names:
+        return raw
+    surname = raw.split()[-1].lower()
+    matches = [g for g in grid_names if g.split()[-1].lower() == surname]
+    if len(matches) == 1:
+        return matches[0]
+    return None
+
+
+def fetch_fp1(year, rnd, grid):
+    """FP1 times via FastF1 if installed and reachable. Empty dict otherwise.
+
+    Deliberately all-or-nothing: the engine gives practice_pace 0.3 to any
+    driver missing from this table, so a partial table would hand a false
+    edge to whoever happens to be listed.
+    """
+    grid_names = [d["driver"] for d in grid]
+    try:
+        import fastf1
+    except ImportError:
+        print("  FP1: FastF1 not installed, skipping")
+        return {}
+    try:
+        cache_dir = Path("data/f1_cache")
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        fastf1.Cache.enable_cache(str(cache_dir))
+        session = fastf1.get_session(year, rnd, "FP1")
+        session.load(telemetry=False, weather=False, messages=False)
+        if not len(session.results):
+            print("  FP1: no data returned, leaving empty")
+            return {}
+        times, unmatched = {}, []
+        for _, row in session.results.iterrows():
+            laps = session.laps.pick_drivers(row["Abbreviation"])
+            if laps.empty:
+                continue
+            best = laps["LapTime"].min()
+            if best is None or str(best) == "NaT":
+                continue
+            name = reconcile_name(str(row["FullName"]), grid_names)
+            if name is None:
+                unmatched.append(str(row["FullName"]))
+                continue
+            times[name] = round(best.total_seconds(), 3)
+        for name in unmatched:
+            print(f"  FP1: '{name}' not on the grid, ignored")
+        covered = sum(1 for g in grid_names if g in times)
+        if covered < len(grid_names) * 0.8:
+            print(f"  FP1: only {covered}/{len(grid_names)} grid drivers matched, leaving empty")
+            return {}
+        return times
+    except Exception as exc:
+        print(f"  FP1: unavailable ({type(exc).__name__}), leaving empty")
+        return {}
+
+
+# ---------------------------------------------------------------- derivations
+
+def apply_penalties(grid, penalties, pitlane):
+    """Rebuild the grid from the qualifying order.
+
+    penalties: {driver: places_dropped}. pitlane: [driver, ...] sent to the back.
+    Non-penalised drivers keep relative order and fill from the front, then each
+    penalised driver takes their target slot. This matches how the FIA forms a
+    grid when several penalties land at once.
+    """
+    if not penalties and not pitlane:
+        return grid
+
+    by_name = {d["driver"]: d for d in grid}
+    for name in list(penalties) + list(pitlane):
+        if name not in by_name:
+            sys.exit(f"Penalty names a driver not on the grid: {name}")
+
+    order = [d["driver"] for d in sorted(grid, key=lambda x: x["pos"])]
+    targets = {}
+    for name, drop in penalties.items():
+        targets[name] = min(order.index(name) + 1 + drop, len(order))
+
+    moved = set(targets) | set(pitlane)
+    clean = [n for n in order if n not in moved]
+    placed = {slot: name for name, slot in targets.items()}
+
+    final, slot, i = [], 1, 0
+    while len(final) < len(order) - len(pitlane):
+        if slot in placed:
+            final.append(placed[slot])
+        elif i < len(clean):
+            final.append(clean[i])
+            i += 1
+        else:
+            break
+        slot += 1
+    final.extend(pitlane)
+
+    out = []
+    for pos, name in enumerate(final, 1):
+        entry = dict(by_name[name])
+        entry["pos"] = pos
+        out.append(entry)
+    return out
+
+
+def team_pace_deficit(grid):
+    best = {}
+    for d in grid:
+        if d["q_time"] is None:
+            continue
+        best[d["team"]] = min(best.get(d["team"], 9e9), d["q_time"])
+    if not best:
+        return {}
+    fastest = min(best.values())
+    return dict(sorted(
+        ((t, round(v - fastest, 3)) for t, v in best.items()),
+        key=lambda x: x[1],
+    ))
+
+
+def driver_experience(grid, prev_results):
+    """r1_finish from the previous round, with a documented fallback.
+
+    A driver absent from the previous classification (mid-season stand-in,
+    debut) gets the midpoint of the field rather than None. The old version
+    wrote None, which serialised to `null` and crashed the import.
+    """
+    prev = {r["driver"]: r["pos"] for r in prev_results}
+    fallback = (len(grid) + 1) // 2
+    out, substitutes = {}, []
+    for d in sorted(grid, key=lambda x: x["pos"]):
+        name = d["driver"]
+        if name in prev:
+            finish = prev[name]
+        else:
+            finish = fallback
+            substitutes.append(name)
+        out[name] = {"f1_seasons": SEASONS.get(name, 5), "r1_finish": finish}
+    return out, substitutes
+
+
+def carry_over_fields(path):
+    """Read hand-tuned blocks out of an existing data.py so a re-fetch keeps them."""
+    if not path.exists():
+        return {}
+    namespace = {}
+    try:
+        exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+    except Exception as exc:
+        print(f"  Could not read existing {path.name} ({type(exc).__name__}), using defaults")
+        return {}
+    return {k: namespace[k] for k in CARRY_OVER if k in namespace}
+
+
+# ------------------------------------------------------------------- emitting
+
+def literal(obj):
+    """Python literal, not JSON. json.dumps writes true/false/null, which are
+    not Python names, so the generated module would fail to import."""
+    return repr(obj)
+
+
+def write_data_py(path, race_info, grid, fp1, sprint, experience,
+                  deficits, carried, notes):
+    L = ['"""']
+    L.append(f"{race_info['name']} ({race_info['circuit']}), round {race_info['round']}")
+    L.append("Generated by fetch_race_data.py from the official timing API.")
+    for note in notes:
+        L.append(note)
+    L.append('"""')
+    L.append("")
+    L.append(f"RACE_INFO = {literal(race_info)}")
+    L.append("")
+
+    L.append("GRID = [")
+    for d in grid:
+        L.append(f"    {literal(d)},")
+    L.append("]")
+    L.append("")
+
+    L.append("FP1_TIMES = {")
+    for name, t in sorted(fp1.items(), key=lambda x: x[1]):
+        L.append(f"    {literal(name)}: {t},")
+    L.append("}")
+    L.append("")
+
+    if sprint:
+        L.append("SPRINT_RESULT = [")
+        for s in sprint:
+            L.append(f"    {literal(s)},")
+        L.append("]")
+    else:
+        L.append("SPRINT_RESULT = []")
+    L.append("")
+
+    L.append("DRIVER_EXPERIENCE = {")
+    for name, info in experience.items():
+        L.append(f"    {literal(name)}: {literal(info)},")
+    L.append("}")
+    L.append("")
+
+    L.append("TEAM_PACE_DEFICIT = {")
+    for team, gap in deficits.items():
+        L.append(f"    {literal(team)}: {gap},")
+    L.append("}")
+    L.append("")
+
+    kept = set(carried)
+    marker = "  # carried over from previous data.py"
+
+    def block(name, default, comment):
+        L.append(comment + (marker if name in kept else ""))
+        L.append(f"{name} = {literal(carried.get(name, default))}")
+        L.append("")
+
+    block("START_PROCEDURE", DEFAULT_START_PROCEDURE,
+          "# Per-team launch quality.")
+    block("ENERGY_READINESS", DEFAULT_ENERGY_READINESS,
+          "# Per-team 2026 hybrid deployment estimates.")
+    block("CIRCUIT", {"type": "balanced", "pit_loss_seconds": 21},
+          "# type is 'high_speed' / 'street' / 'balanced'.")
+    block("TYRE_COMPOUNDS", {"hardness": 0.5, "one_stop_probability": 0.65},
+          "# hardness: 0=softest, 1=hardest.")
+    block("WEATHER", {"track_temp_c": 30, "rain_probability": 0.10},
+          "# REPLACE with the race day forecast before predicting.")
+    block("CIRCUIT_HISTORY", {},
+          "# Past results at this circuit, per driver.")
+
+    path.write_text("\n".join(L), encoding="utf-8")
+    compile(path.read_text(encoding="utf-8"), str(path), "exec")
+
+
+def score_round(config_path, race_dir, rnd, race_name, results):
+    """Append this round's accuracy entry to config.json."""
+    pred_path = race_dir / "prediction.json"
+    if not pred_path.exists():
+        print("  No prediction.json, skipping scoring")
+        return
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    history = config.setdefault("accuracy_history", [])
+    if any(e.get("round") == rnd for e in history):
+        print(f"  Round {rnd} already scored, leaving config alone")
+        return
+
+    pred = json.loads(pred_path.read_text(encoding="utf-8"))
+    finish = {r["driver"]: r["pos"] for r in results}
+    actual = [r["driver"] for r in results[:3]]
+    mc = [p["driver"] for p in pred["predictions"][:3]]
+    errors = [abs(finish.get(d, len(results)) - (i + 1)) for i, d in enumerate(mc)]
+
+    entry = {
+        "round": rnd,
+        "race": race_name,
+        "predicted_winner": mc[0],
+        "predicted_win_pct": pred["predictions"][0]["win_pct"],
+        "actual_winner": actual[0],
+        "correct": mc[0] == actual[0],
+        "podium_predicted": mc,
+        "podium_actual": actual,
+        "podium_overlap": len(set(mc) & set(actual)),
+        "mean_position_error": round(sum(errors) / len(errors), 2),
+    }
+
+    xgb = pred.get("xgboost") or {}
+    if xgb.get("predictions"):
+        xg = [p["driver"] for p in xgb["predictions"][:3]]
+        entry["xgb_winner_correct"] = xg[0] == actual[0]
+        entry["xgb_podium_overlap"] = len(set(xg) & set(actual))
+
+    history.append(entry)
+    history.sort(key=lambda e: e["round"])
+    config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+
+    hits = sum(e["correct"] for e in history)
+    xgb_rounds = [e for e in history if "xgb_winner_correct" in e]
+    xgb_hits = sum(e["xgb_winner_correct"] for e in xgb_rounds)
+    print(f"  Scored R{rnd}: predicted {mc[0]}, won {actual[0]}")
+    print(f"  Monte Carlo {hits}/{len(history)}  XGBoost {xgb_hits}/{len(xgb_rounds)}")
+
+
+# ----------------------------------------------------------------------- main
+
+def parse_penalty(raw):
+    if ":" not in raw:
+        sys.exit(f'Penalty must look like "Driver Name:3", got: {raw}')
+    name, places = raw.rsplit(":", 1)
+    return name.strip(), int(places)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fetch race data from FastF1 and generate data.py")
-    parser.add_argument("folder", help="Local race folder name, e.g. 06_monaco")
-    parser.add_argument("--year", type=int, default=2026)
-    parser.add_argument("--round", type=int, required=True, help="F1 official round number")
-    parser.add_argument("--circuit", required=True, help="Circuit/GP name FastF1 recognizes, e.g. Monaco")
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("folder", help="race folder, e.g. 12_netherlands")
+    ap.add_argument("--round", type=int, required=True)
+    ap.add_argument("--year", type=int, default=2026)
+    ap.add_argument("--races-dir", default="races")
+    ap.add_argument("--config", default="config.json")
+    ap.add_argument("--penalty", action="append", default=[],
+                    metavar='"Driver:places"', help="grid drop, repeatable")
+    ap.add_argument("--pitlane", action="append", default=[],
+                    metavar='"Driver"', help="pit lane start, repeatable")
+    ap.add_argument("--no-fp1", action="store_true", help="skip the FastF1 lookup")
+    ap.add_argument("--result", action="store_true",
+                    help="write result.json for a finished race")
+    ap.add_argument("--score", action="store_true",
+                    help="append this round to config accuracy_history")
+    args = ap.parse_args()
 
-    setup_cache()
+    races_dir = Path(args.races_dir)
+    race_dir = races_dir / args.folder
+    race_dir.mkdir(parents=True, exist_ok=True)
 
-    races_dir = Path("races")
-    race_folder = races_dir / args.folder
-    race_folder.mkdir(parents=True, exist_ok=True)
+    if args.result or args.score:
+        print(f"Fetching results for {args.year} round {args.round}")
+        results = fetch_results(args.year, args.round)
+        if not results:
+            sys.exit("No race results published yet.")
+        if args.result:
+            payload = {"result": [
+                {"pos": r["pos"], "driver": r["driver"],
+                 "team": "", "status": r["status"]}
+                for r in results
+            ]}
+            out = race_dir / "result.json"
+            out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            print(f"  Wrote {out} ({len(results)} classified)")
+        if args.score:
+            score_round(Path(args.config), race_dir,
+                        args.round, args.folder.split("_", 1)[-1].title(), results)
+        return
 
-    print(f"Fetching {args.year} {args.circuit} GP (round {args.round}) from FastF1...")
+    print(f"Fetching {args.year} round {args.round}")
+    race, grid = fetch_qualifying(args.year, args.round)
+    print(f"  Qualifying: {len(grid)} drivers")
 
-    print("  Qualifying...")
-    grid = fetch_grid(args.year, args.circuit)
-    print(f"    {len(grid)} drivers loaded.")
+    penalties = dict(parse_penalty(p) for p in args.penalty)
+    if penalties or args.pitlane:
+        grid = apply_penalties(grid, penalties, args.pitlane)
+        for name, drop in penalties.items():
+            print(f"  Penalty: {name} drops {drop}")
+        for name in args.pitlane:
+            print(f"  Pit lane start: {name}")
 
-    print("  FP1...")
-    fp1 = fetch_fp1_times(args.year, args.circuit)
-    print(f"    {len(fp1)} drivers loaded.")
+    sprint = fetch_sprint(args.year, args.round)
+    if sprint:
+        print(f"  Sprint: {len(sprint)} classified")
 
-    print("  Sprint (if applicable)...")
-    sprint = fetch_sprint_result(args.year, args.circuit)
-    is_sprint = bool(sprint)
-    print(f"    {'Yes' if is_sprint else 'No'} sprint this weekend.")
+    prev = fetch_results(args.year, args.round - 1) if args.round > 1 else []
+    experience, substitutes = driver_experience(grid, prev)
+    if prev:
+        print(f"  Previous round: {len(prev)} finishers read for r1_finish")
+    for name in substitutes:
+        print(f"  {name} absent from R{args.round - 1}, r1_finish set to field midpoint")
 
-    print("  Computing team pace deficit from quali times...")
-    team_pace = compute_team_pace_deficit(grid)
+    fp1 = {} if args.no_fp1 else fetch_fp1(args.year, args.round, grid)
+    if fp1:
+        print(f"  FP1: {len(fp1)} times")
 
-    print("  Reading previous race result.json for driver finishes...")
-    prev_finishes = fetch_previous_race_finishes(races_dir, args.round)
-    print(f"    {len(prev_finishes)} previous-race finishes loaded.")
+    data_path = race_dir / "data.py"
+    carried = carry_over_fields(data_path)
+    if carried:
+        print(f"  Carried over: {', '.join(sorted(carried))}")
 
-    output_path = race_folder / "data.py"
-    write_data_py(
-        output_path=output_path,
-        race_name=args.circuit,
-        round_num=args.round,
-        grid=grid,
-        fp1_times=fp1,
-        sprint_result=sprint,
-        team_pace_deficit=team_pace,
-        prev_finishes=prev_finishes,
-        is_sprint_weekend=is_sprint,
-    )
+    notes = []
+    if penalties or args.pitlane:
+        notes.append("Grid is post-penalty.")
+    if substitutes:
+        notes.append("r1_finish is a field-midpoint placeholder for: "
+                     + ", ".join(substitutes))
+    if not fp1:
+        notes.append("FP1_TIMES left empty on purpose, see fetch_race_data.py.")
 
-    print(f"\nWrote {output_path}")
-    print("\nNEXT STEPS:")
-    print(f"  1. Open {output_path} in VS Code")
-    print("  2. Edit WEATHER with race day forecast (rain probability and track temp)")
-    print("  3. Edit CIRCUIT type (high_speed / street / balanced) and pit_loss_seconds")
-    print("  4. Edit TYRE_COMPOUNDS based on Pirelli's allocation")
-    print("  5. Add CIRCUIT_HISTORY entries for veterans with strong records here")
-    print(f"  6. Run: python engine.py {args.folder}")
+    race_info = {
+        "name": race["raceName"],
+        "circuit": args.folder.split("_", 1)[-1].title(),
+        "date": race.get("date", ""),
+        "round": args.round,
+        "is_sprint_weekend": bool(sprint),
+    }
+
+    write_data_py(data_path, race_info, grid, fp1, sprint, experience,
+                  team_pace_deficit(grid), carried, notes)
+    print(f"  Wrote {data_path}")
+    print(f"\nNext: python engine.py {args.folder}")
 
 
 if __name__ == "__main__":
