@@ -328,8 +328,13 @@ def write_data_py(
 
 
 def json_compact(obj) -> str:
-    """JSON dump with no trailing newline, suitable for inline embedding."""
-    return json.dumps(obj, ensure_ascii=False)
+    """JSON dump with no trailing newline, suitable for inline embedding.
+
+    JSON writes booleans as true/false, which are not valid Python names.
+    The generated data.py would raise NameError on import, so convert them.
+    """
+    s = json.dumps(obj, ensure_ascii=False)
+    return s.replace(": true", ": True").replace(": false", ": False")
 
 
 def main():
