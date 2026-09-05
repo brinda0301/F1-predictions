@@ -264,9 +264,16 @@ def fetch_fp1(year, rnd, grid):
             times[name] = round(best.total_seconds(), 3)
         for name in unmatched:
             print(f"  FP1: '{name}' not on the grid, ignored")
-        covered = sum(1 for g in grid_names if g in times)
-        if covered < len(grid_names) * 0.8:
-            print(f"  FP1: only {covered}/{len(grid_names)} grid drivers matched, leaving empty")
+        covered = [g for g in grid_names if g in times]
+        missing = [g for g in grid_names if g not in times]
+        # A driver who sat out FP1 for a rookie run is not slow, but the engine
+        # scores any missing name as practice_pace 0.3. At Monza 2026 that cost
+        # the pole sitter three points of win probability. Reject the table
+        # unless coverage is near-total, and always name who is absent.
+        if missing:
+            print(f"  FP1: no time for {', '.join(missing)}")
+        if len(covered) < len(grid_names) * 0.95:
+            print(f"  FP1: only {len(covered)}/{len(grid_names)} grid drivers covered, leaving empty")
             return {}
         return times
     except Exception as exc:
