@@ -232,6 +232,28 @@
       "mean_position_error": 2.0,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 1
+    },
+    {
+      "round": 12,
+      "race": "Netherlands",
+      "predicted_winner": "Lando Norris",
+      "predicted_win_pct": 36.0,
+      "actual_winner": "Lando Norris",
+      "correct": true,
+      "podium_predicted": [
+        "Lando Norris",
+        "George Russell",
+        "Andrea Kimi Antonelli"
+      ],
+      "podium_actual": [
+        "Lando Norris",
+        "Andrea Kimi Antonelli",
+        "George Russell"
+      ],
+      "podium_overlap": 3,
+      "mean_position_error": 0.67,
+      "xgb_winner_correct": true,
+      "xgb_podium_overlap": 2
     }
   ]
 }
