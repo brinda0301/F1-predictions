@@ -100,6 +100,37 @@ def race_banner_text(folder, race_info):
     return " | ".join(parts)
 
 
+def pole_sitter(prediction):
+    """Driver who started P1, read from prediction.json rather than data.py."""
+    if not prediction:
+        return None
+    for entry in prediction.get("predictions", []):
+        if entry.get("grid_pos") == 1:
+            return entry.get("driver")
+    return None
+
+
+def baseline_record(folders):
+    """How often the pole sitter won, over races that have a result.
+
+    This is the naive strategy the model has to beat. Showing it next to the
+    model's own record is the honest comparison: without it, a hit rate is a
+    number with nothing to measure against.
+    """
+    hits = raced = 0
+    for folder in folders:
+        result = load_result(folder)
+        if not result or not result.get("result"):
+            continue
+        pole = pole_sitter(load_prediction(folder))
+        if not pole:
+            continue
+        raced += 1
+        if result["result"][0].get("driver") == pole:
+            hits += 1
+    return hits, raced
+
+
 config = load_config()
 folders = get_race_folders()
 predicted_races = [f for f in folders if load_prediction(f)]
@@ -120,9 +151,9 @@ st.markdown(f"""
         <div style="font-size:11px;color:#666;">100K Monte Carlo + XGBoost | Zero betting data | 2026 regulation-aware</div>
     </div>
     <div style="text-align:right;">
-        <div style="font-size:9px;letter-spacing:2px;color:#555;">WINNER ACCURACY</div>
-        <div style="font-size:32px;font-weight:900;color:#00D2BE;font-family:monospace;">{mc_correct}/{len(history)}</div>
-        <div style="font-size:9px;color:#555;">Monte Carlo, calibrated after R{config.get('last_calibrated_after_round', 0)}</div>
+        <div style="font-size:9px;letter-spacing:2px;color:#555;">RACES PREDICTED</div>
+        <div style="font-size:32px;font-weight:900;color:#00D2BE;font-family:monospace;">{len(predicted_races)}</div>
+        <div style="font-size:9px;color:#555;">Calibrated after R{config.get('last_calibrated_after_round', 0)} | accuracy in Season tab</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -258,10 +289,24 @@ with tab_season:
         mc_rate = round(100 * mc_correct / total, 1) if total else 0
         avg_podium = round(sum(h.get("podium_overlap", 0) for h in history) / total, 2) if total else 0
 
-        c1, c2, c3 = st.columns(3)
+        pole_hits, pole_races = baseline_record(folders)
+        pole_rate = round(100 * pole_hits / pole_races, 1) if pole_races else 0
+        edge = round(mc_rate - pole_rate, 1)
+
+        c1, c2, c3, c4 = st.columns(4)
         c1.metric("Races Predicted", total)
         c2.metric("Monte Carlo Winners", f"{mc_correct}/{total}", f"{mc_rate}%")
-        c3.metric("Avg Podium Drivers Hit", f"{avg_podium}/3")
+        c3.metric("Always-Pole Baseline", f"{pole_hits}/{pole_races}", f"{pole_rate}%")
+        c4.metric("Avg Podium Drivers Hit", f"{avg_podium}/3")
+
+        if pole_races:
+            verdict = "ahead of" if edge > 0 else "behind" if edge < 0 else "level with"
+            st.caption(
+                f"The model is {verdict} the naive strategy of always picking the pole sitter, "
+                f"by {abs(edge)} points. At {pole_races} races that gap is well inside noise, "
+                f"so neither number supports a claim yet. Beating this baseline over a full "
+                f"season is the bar the model has to clear."
+            )
 
         st.markdown("")
 
