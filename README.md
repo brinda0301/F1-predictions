@@ -28,11 +28,14 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
 | 10 | Belgian GP | Antonelli (34.45%) | Verstappen (44.18%) | Antonelli | Correct | Miss |
 | 11 | Hungarian GP | Hamilton (29.82%) | Hamilton | Norris | Miss | Miss |
 | 12 | Dutch GP | Norris (36.0%) | Norris (42.69%) | Norris | Correct | Correct |
-| 13 | Italian GP | Russell (15.48%) | Russell (49.54%) | pending | pending | pending |
+| 13 | Italian GP | Russell (15.48%) | Russell (49.54%) | Antonelli | Miss | Miss |
+| 14 | Spanish GP | Norris (25.33%) | Antonelli (40.0%) | pending | pending | pending |
  
-**After 12 scored races**: Monte Carlo 7/12 winners correct (58%). XGBoost 3/9 since debut (33%). Average podium drivers hit: 1.9 of 3.
+**After 13 scored races**: Monte Carlo 7/13 winners correct (54%). XGBoost 3/10 since debut (30%). Average podium drivers hit: 2.0 of 3.
 
-**The baseline it has to beat**: always picking the pole sitter gets 9/12 (75%). The model is 16.7 points behind. At 12 races a two-race gap is well inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute. Beating it over a full season is the goal; the backtest in the roadmap is what makes that measurable.
+**The baseline it has to beat**: always picking the pole sitter gets 9/13 (69%). The model is 15.4 points behind. At 13 races a two-race gap is well inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute. Beating it over a full season is the goal; the backtest in the roadmap is what makes that measurable.
+
+**Round 14 is the first split decision since Hungary.** Monte Carlo picks Norris from pole; XGBoost picks Antonelli from P2. FP1 is what divides them: Russell topped practice with Antonelli second and Norris only sixth, and XGBoost leans on `practice_pace` more heavily. Both predictions are committed before lights out, so the result says something about which model should own winner selection.
  
 Four races this season were decided by mechanical failure, not pace: Russell's power unit at Canada, Antonelli's engine at Barcelona, Antonelli's wheel shield at Britain, Russell's retirement at Belgium. No model predicts a part breaking from qualifying data.
  
@@ -80,6 +83,18 @@ The model used a single temperature (0.11) for every circuit. Monaco should not 
  
 ## Key Race Analyses
  
+### R13 Monza: The Flaw Called It Better Than the Model Did
+
+Antonelli won from the back of the grid, the first Italian to win at Monza since 1966. Monte Carlo picked Russell, who finished second, for a podium overlap of 2 and a mean position error of 1.67. XGBoost picked Russell too, overlap 1.
+
+The interesting part is what the model said about the winner. Antonelli started P22 and Monte Carlo ranked him fourth at 9.72%, above the pole sitter. Before the race that read as an obvious defect, and it is written up below as one. He then won.
+
+This does not vindicate the weighting, and the fix still stands. The reason is worth stating precisely: Monza is the easiest overtaking circuit on the calendar, so low grid weighting is *correct* there. The queued fix weights grid position by track type, which would leave Monza roughly as it is and raise it sharply at Monaco. The Monza result is evidence for that change, not against it.
+
+What was wrong was the generalisation. "A back-row start outranking pole is indefensible" is true at Monaco and false at Monza. A model can be right for a structural reason and still need fixing, and the reverse is equally possible.
+
+Pole also failed here. Gasly started first and finished seventh, so the baseline dropped to 9/13.
+
 ### R13 Monza: The Model Ranks a Back-Row Start Above Pole
 
 Pierre Gasly took a shock pole for Alpine, a team the model ranked ninth on season pace but which posted the fastest single-lap time of the weekend at a 0.0 pace deficit. Monte Carlo puts Gasly seventh at 7.07%.
@@ -146,6 +161,18 @@ That reconciliation matters more than it looks. The engine reads FP1 by grid nam
 
 FP1 is written all-or-nothing for the same reason, and the threshold had to be tightened twice. At Monza the API returned times for 18 of 22 drivers, which cleared an 80 percent gate. The four absent drivers had sat out FP1 for rookie runs, and one of them was the pole sitter. Scored on the 0.3 fallback, Gasly dropped from 7.07% to 4.12% and Verstappen from 10.14% to 5.98%, while Russell, Hamilton and Leclerc each gained roughly 3.3 points they had not earned. The gate now sits at 95 percent and the script names every grid driver missing a time.
 
+### Three Silent Data Bugs
+
+None of these threw an exception. Each was found by reading a published timing sheet against the generated file, and each changed the prediction.
+
+**Driver name mismatch across sources.** FastF1 writes "Kimi Antonelli", the timing API writes "Andrea Kimi Antonelli". Same for Oliver against Ollie Bearman and Alexander against Alex Albon. The engine looks FP1 up by grid name, so three drivers fell to the `practice_pace` fallback of 0.3. Antonelli had topped the session at Zandvoort and was scored as if slowest: 4.57% instead of 9.42%, off the predicted podium. He finished second. Fixed by reconciling names against the grid by surname.
+
+**Drivers who race without qualifying.** At Madrid the API returned 20 drivers, not 22. Bearman never left the garage after an FP3 crash and Stroll set no time, both cleared to race at the stewards' discretion. The qualifying classification only lists drivers who set a time, so both vanished from the grid entirely. Fixed with `--absent "Driver:Team"`, which places them behind the classified runners with `q_time` of None, which the engine already reads as neutral.
+
+**Fastest lap read as latest session.** The original `best_lap` took Q3, then Q2, then Q1, assuming later sessions are quicker. Albon set 1:35.307 in Q1 and a slower 1:35.532 in Q2, so he was recorded two tenths off his real pace. Harmless at P16. The damaging case is a front-runner who banks a good Q2 lap and has Q3 ruined by a red flag, who would then be scored on the ruined lap. Fixed by taking the minimum across all three sessions.
+
+The pattern matters more than any single bug. All three produced plausible numbers, none produced an error, and all three were caught by eye rather than by anything automated. That is the strongest argument in this repo for the backtest: 60-plus races surface distortions that 13 races hide.
+
 The deeper issue lives in the engine, not the fetcher: `practice_pace` defaults to 0.3, a low value, so a driver who did not run reads as a driver who was slow. Those are different things. Moving the default to the median of drivers who did run is on the roadmap.
 
 Hand-edited per race: weather forecast, circuit type, tyre compounds, circuit history. These carry over from the previous `data.py`, so a re-fetch no longer wipes tuning.
@@ -163,7 +190,8 @@ Hand-edited per race: weather forecast, circuit type, tyre compounds, circuit hi
 | 10 | Verstappen | Antonelli | Miss | 3/3 | 191 | 0.321 |
 | 11 | Hamilton | Norris | Miss | 1/3 | 213 | 0.316 |
 | 12 | Norris | Norris | Correct | 2/3 | 235 | 0.396 |
-| 13 | Russell | pending | pending | pending | 257 | 0.421 |
+| 13 | Russell | Antonelli | Miss | 1/3 | 257 | 0.421 |
+| 14 | Antonelli | pending | pending | pending | 279 | 0.486 |
  
 ## 2026 Regulation Constants
  
@@ -230,7 +258,7 @@ F1-predictions/
 ├── config.json            Feature weights, accuracy history, regulation params
 ├── requirements.txt
 └── races/
-    ├── 01_australia/ ... 13_italy/
+    ├── 01_australia/ ... 14_spain/
     │   ├── data.py         Race inputs
     │   ├── prediction.json Locked before the race
     │   └── result.json     Actual outcome
@@ -244,6 +272,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
  
 ## Roadmap
  
+- **Tests**: three would have caught the bugs above before they shipped. Penalty reordering against a known published grid, name reconciliation against the three known mismatches, and a schema check that every grid driver appears in `FP1_TIMES` or is explicitly absent
 - **Backtest harness**: replay the model against 2024 and 2025 seasons to validate across 60-plus races instead of 12. This is the top priority. At the current sample size the gap against the pole baseline is not statistically distinguishable from zero, so no accuracy claim here is worth much until the sample grows
 - **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
 - **Brier score logging**: track probability calibration quality with a single number after each race
@@ -253,7 +282,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Refresh hand-set team constants**: `ENERGY_READINESS`, `START_PROCEDURE`, `tyre_management` and `circuit_fit` are set by hand and rarely revisited. At R13 they held Alpine down while measured pace put the car on pole. Priors should decay toward measured performance as the season provides evidence
 - **Practice-pace fallback**: a driver missing from `FP1_TIMES` scores 0.3, a low value, so sitting out a session for a rookie run reads as slowness. The median of drivers who did run would treat absence as no information instead of bad information
 - **Dead XGBoost features**: at R12 the model assigned `race_pace` and `tyre_management` zero importance, while `tyre_compound_fit` and `energy_score` together carried 51%. With 235 rows at max_depth 3, that concentration needs investigating before more features are added
-Next race: Spanish GP, Madring, September 9 to 11, 2026.
+Next race: Azerbaijan GP, Baku, September 25 to 27, 2026.
  
 ---
 Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/marianaantaya/).
