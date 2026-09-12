@@ -80,6 +80,7 @@ RACE_META = {
     "11_hungary":    ("Hungarian Grand Prix", "Hungaroring"),
     "12_netherlands": ("Dutch Grand Prix", "Circuit Zandvoort"),
     "13_italy":      ("Italian Grand Prix", "Monza"),
+    "14_spain":      ("Spanish Grand Prix", "Madring, Madrid"),
 }
 
 

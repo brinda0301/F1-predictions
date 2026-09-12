@@ -145,11 +145,18 @@ def to_seconds(clock):
 
 
 def best_lap(entry):
-    for key in ("Q3", "Q2", "Q1"):
-        secs = to_seconds(entry.get(key))
-        if secs is not None:
-            return secs
-    return None
+    """Fastest lap the driver set across Q1, Q2 and Q3.
+
+    Not the latest session reached. A later session is usually quicker, but not
+    always: a red flag, traffic or an aborted lap can leave a driver's Q2 or Q3
+    time slower than the one they banked earlier. Albon at Madrid 2026 set
+    1:35.307 in Q1 and 1:35.532 in Q2, and taking the later session recorded him
+    two tenths off his real pace. The damaging version is a front-runner whose
+    Q3 lap is ruined, who would then be scored on the ruined lap.
+    """
+    laps = [to_seconds(entry.get(key)) for key in ("Q1", "Q2", "Q3")]
+    laps = [lap for lap in laps if lap is not None]
+    return min(laps) if laps else None
 
 
 # ---------------------------------------------------------------- API fetches
@@ -505,6 +512,36 @@ def score_round(config_path, race_dir, rnd, race_name, results):
 
 # ----------------------------------------------------------------------- main
 
+def parse_absent(raw):
+    """'Ollie Bearman:Haas' -> ('Ollie Bearman', 'Haas')"""
+    if ":" not in raw:
+        sys.exit(f'--absent must look like "Driver Name:Team", got: {raw}')
+    name, team = raw.rsplit(":", 1)
+    return name.strip(), team.strip()
+
+
+def append_absentees(grid, absentees):
+    """Add drivers who race but set no qualifying time.
+
+    The API's qualifying classification only lists drivers who set a time, so a
+    driver cleared to race at the stewards' discretion (crash damage, a car that
+    never left the garage) is missing from it entirely. Left unhandled the grid
+    comes out short and those drivers vanish from the prediction. They line up
+    behind the classified runners with no q_time, which the engine already
+    treats as a neutral qualifying pace rather than a fast or slow one.
+    """
+    if not absentees:
+        return grid
+    out = list(grid)
+    pos = len(out)
+    for name, team in absentees:
+        if any(d["driver"] == name for d in out):
+            sys.exit(f"--absent names a driver already in qualifying: {name}")
+        pos += 1
+        out.append({"driver": name, "team": team, "pos": pos, "q_time": None})
+    return out
+
+
 def parse_penalty(raw):
     if ":" not in raw:
         sys.exit(f'Penalty must look like "Driver Name:3", got: {raw}')
@@ -524,6 +561,9 @@ def main():
                     metavar='"Driver:places"', help="grid drop, repeatable")
     ap.add_argument("--pitlane", action="append", default=[],
                     metavar='"Driver"', help="pit lane start, repeatable")
+    ap.add_argument("--absent", action="append", default=[],
+                    metavar='"Driver:Team"',
+                    help="races but set no qualifying time, repeatable")
     ap.add_argument("--no-fp1", action="store_true", help="skip the FastF1 lookup")
     ap.add_argument("--result", action="store_true",
                     help="write result.json for a finished race")
@@ -558,6 +598,12 @@ def main():
     race, grid = fetch_qualifying(args.year, args.round)
     print(f"  Qualifying: {len(grid)} drivers")
 
+    absentees = [parse_absent(a) for a in args.absent]
+    if absentees:
+        grid = append_absentees(grid, absentees)
+        for name, team in absentees:
+            print(f"  No qualifying time: {name} ({team}), placed at the back")
+
     penalties = dict(parse_penalty(p) for p in args.penalty)
     if penalties or args.pitlane:
         grid = apply_penalties(grid, penalties, args.pitlane)
@@ -589,6 +635,9 @@ def main():
     notes = []
     if penalties or args.pitlane:
         notes.append("Grid is post-penalty.")
+    if absentees:
+        notes.append("Set no qualifying time, q_time is None: "
+                     + ", ".join(n for n, _ in absentees))
     if substitutes:
         notes.append("r1_finish is a field-midpoint placeholder for: "
                      + ", ".join(substitutes))
