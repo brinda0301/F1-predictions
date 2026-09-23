@@ -1,17 +1,26 @@
 # F1 2026 Race Predictor
- 
-A self-calibrating ML system that predicts F1 race winners from qualifying, practice, sprint, tyre, circuit, and weather data. Every prediction is committed to GitHub before the race, timestamped and public, so the track record cannot be edited after the fact.
- 
+
+Predicts F1 race winners from timing data, commits every prediction to GitHub before the race, and measures the result against a naive baseline.
+
+**The headline finding is a negative one.** Backtested over 48 races from 2024 and 2025, the model picks the pole sitter in 45 of them. It ties "always pick pole" exactly, 28 winners each, because 94% of the time they are the same prediction. Fifteen of its eighteen features change nothing. The XGBoost component loses to predicting that every driver finishes where they started.
+
+That is the point of the repo. The interesting work is not the model, it is the measurement that showed the model adds nothing, and the diagnosis of why: every feature is either derived from qualifying pace or fixed per team, so nothing in it can disagree with the grid.
+
 **Live dashboard: [f1-predictions-bb.streamlit.app](https://f1-predictions-bb.streamlit.app/)**
- 
+
 ## What It Does
- 
+
 Two models run side by side on every race:
- 
-- **Monte Carlo**: 100,000 simulations across 18 weighted features. Self-calibrates its feature weights after each race using gradient descent.
-- **XGBoost**: trains on past race features and finishing positions. Re-trains from scratch each race using all completed races.
-The public dashboard shows both predictions, the actual result, a Correct or Miss badge per model, and running season accuracy.
- 
+
+- **Monte Carlo**: 100,000 simulations across 18 weighted features, with weights adjusted after each race by gradient descent.
+- **XGBoost**: trains on past race features and finishing positions, re-fitted from scratch each race.
+
+Every prediction is committed before lights out and never regenerated, so the track record cannot be edited after the fact. When a bug is found, the fix applies going forward and the old prediction stands.
+
+`backtest.py` replays 2024 and 2025 through the same feature model with leave-one-race-out scoring, so any change can be tested against 48 races in minutes rather than one data point per fortnight.
+
+The public dashboard shows both predictions, the actual result, a Correct or Miss badge per model, running season accuracy, and the pole baseline beside it.
+
 ## Season Track Record
  
 | Round | Race | Monte Carlo | XGBoost | Actual | MC | XGB |
@@ -37,10 +46,6 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
 
 **These numbers were wrong until R14.** Results for R1-R9 were hand-entered and the midfield was 4-7 places out, up to 16 in places. Winners were right throughout, so the headline accuracy never moved, but two podiums were scored 3/3 that were really 2/3, and several mean position errors were badly understated: Canada was recorded as 0.45 and is 11.0, Britain as 0.36 and is 5.33. Every result is now pulled from the official timing API and verified against it. See Three Silent Data Bugs below.
 
-**The baseline it has to beat**: always picking the pole sitter gets 9/13 (69%). The model is 15.4 points behind. At 13 races a two-race gap is well inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute. Beating it over a full season is the goal; the backtest in the roadmap is what makes that measurable.
-
-**Round 14 is the first split decision since Hungary.** Monte Carlo picks Norris from pole; XGBoost picks Antonelli from P2. FP1 is what divides them: Russell topped practice with Antonelli second and Norris only sixth, and XGBoost leans on `practice_pace` more heavily. Both predictions are committed before lights out, so the result says something about which model should own winner selection.
- 
 Four races this season were decided by mechanical failure, not pace: Russell's power unit at Canada, Antonelli's engine at Barcelona, Antonelli's wheel shield at Britain, Russell's retirement at Belgium. No model predicts a part breaking from qualifying data.
  
 ## The 18 Features
@@ -333,6 +338,28 @@ long-run practice pace, tyre strategy divergence, circuit-specific overtaking
 rates, pit-lane time loss. Each can now be measured against 48 races in about
 four minutes instead of one data point per fortnight.
 
+## Tests
+
+`python test_pipeline.py` or `python -m pytest test_pipeline.py -v`
+
+Nine tests covering the three bug classes that reached production this season. Each of those bugs produced plausible numbers, threw no exception, and was caught by eye weeks later.
+
+| Test | Bug it encodes |
+| --- | --- |
+| `test_penalty_reordering_matches_published_grid` | Grid penalties applied by hand, verified against the FIA's Hungary grid |
+| `test_penalty_on_unknown_driver_fails_loudly` | A misspelled driver name silently doing nothing |
+| `test_no_grid_driver_is_shadowed_by_a_name_variant` | FastF1 and the API spelling three drivers differently, dropping them to the `practice_pace` fallback |
+| `test_name_reconciliation_maps_known_variants` | The mapping itself |
+| `test_name_reconciliation_rejects_non_starters` | Reserve drivers in FP1 must not match a grid entry |
+| `test_race_files_are_structurally_sound` | Duplicate grid slots, missing pace deficits, absent `r1_finish` |
+| `test_results_match_grid_names` | Spelling drift silently shrinking the XGBoost training set |
+| `test_fastest_lap_is_the_fastest_not_the_latest` | Taking the latest session's lap rather than the quickest |
+| `test_predictions_are_never_regenerated` | The project's core claim, that published predictions are never edited |
+
+Each data test was validated by reintroducing the original bug and confirming it fires.
+
+Files written before the API pipeline carry known gaps, such as missing `r1_finish`. Those predictions are published and are not regenerated, so the structural checks apply from `10_belgium` onward. That boundary is a constant at the top of the file.
+
 ## Project Structure
  
 ```
@@ -342,6 +369,7 @@ F1-predictions/
 ├── app_public.py          Public read-only dashboard, deployed to Streamlit Cloud
 ├── fetch_race_data.py     Timing API pipeline: grid, sprint, penalties, results, scoring
 ├── backtest.py            Replays 2024-2025, leave-one-race-out scoring and feature ablation
+├── test_pipeline.py       Nine tests covering the bug classes that reached production
 ├── config.json            Feature weights, accuracy history, regulation params
 ├── requirements.txt
 └── races/
@@ -360,7 +388,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 ## Roadmap
  
 - **Fix the engine bugs from the audit**: double-counted DNF, the recovery bonus that rewards starting further back, the pole sitter excluded from the random boost, and the reliability feature. These change future predictions only; published predictions are never regenerated
-- **Tests**: three would have caught the bugs above before they shipped. Penalty reordering against a known published grid, name reconciliation against the three known mismatches, and a schema check that every grid driver appears in `FP1_TIMES` or is explicitly absent
+- **Extend test coverage to the engine**. `test_pipeline.py` covers the data layer. The simulation itself has none, and both R15 engine fixes were bugs a test would have caught
 - **Find a feature independent of qualifying pace**. This is now the whole problem. The backtest shows the model reproduces the grid in 94% of races because every feature is either derived from qualifying or fixed per team. Candidates: long-run practice pace, tyre strategy divergence, circuit overtaking rates, pit-lane time loss. Each is testable against 48 races in minutes
 - **Cut the dead features**. Fifteen of eighteen change nothing across 48 races, and three make results marginally worse. Removing them costs no accuracy and makes the remainder interpretable
 - **Settle the recovery term and the reliability feature with the harness**. Both are known-wrong but their replacements are design choices, and the backtest can now measure which version is better rather than leaving it to opinion
