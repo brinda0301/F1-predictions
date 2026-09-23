@@ -26,7 +26,7 @@ RACE_INFO = {
 }
 
 GRID = [
-    {"pos": 1,  "driver": "Kimi Antonelli",      "team": "Mercedes",      "q_time": 88.778},
+    {"pos": 1,  "driver": "Andrea Kimi Antonelli",      "team": "Mercedes",      "q_time": 88.778},
     {"pos": 2,  "driver": "George Russell",       "team": "Mercedes",      "q_time": 89.076},
     {"pos": 3,  "driver": "Oscar Piastri",        "team": "McLaren",       "q_time": 89.132},
     {"pos": 4,  "driver": "Charles Leclerc",      "team": "Ferrari",       "q_time": 89.405},
@@ -43,7 +43,7 @@ GRID = [
     {"pos": 15, "driver": "Franco Colapinto",     "team": "Alpine",        "q_time": 90.771},
     {"pos": 16, "driver": "Carlos Sainz",         "team": "Williams",      "q_time": 91.177},
     {"pos": 17, "driver": "Alex Albon",           "team": "Williams",      "q_time": 90.365},
-    {"pos": 18, "driver": "Oliver Bearman",       "team": "Haas",          "q_time": 90.367},
+    {"pos": 18, "driver": "Ollie Bearman",       "team": "Haas",          "q_time": 90.367},
     {"pos": 19, "driver": "Sergio Perez",         "team": "Cadillac",      "q_time": 91.483},
     {"pos": 20, "driver": "Valtteri Bottas",      "team": "Cadillac",      "q_time": 91.607},
     {"pos": 21, "driver": "Fernando Alonso",      "team": "Aston Martin",  "q_time": 91.923},
@@ -51,11 +51,11 @@ GRID = [
 ]
 
 FP1_TIMES = {
-    "George Russell": 90.1, "Kimi Antonelli": 89.9, "Lewis Hamilton": 90.4,
+    "George Russell": 90.1, "Andrea Kimi Antonelli": 89.9, "Lewis Hamilton": 90.4,
     "Charles Leclerc": 90.3, "Oscar Piastri": 90.0, "Lando Norris": 90.5,
     "Max Verstappen": 90.8, "Isack Hadjar": 91.0, "Pierre Gasly": 90.7,
     "Liam Lawson": 91.2, "Arvid Lindblad": 91.1, "Alex Albon": 91.5,
-    "Oliver Bearman": 91.3, "Esteban Ocon": 91.4, "Gabriel Bortoleto": 91.0,
+    "Ollie Bearman": 91.3, "Esteban Ocon": 91.4, "Gabriel Bortoleto": 91.0,
     "Franco Colapinto": 91.6, "Carlos Sainz": 91.8, "Nico Hulkenberg": 91.3,
     "Fernando Alonso": 92.2, "Sergio Perez": 92.0, "Lance Stroll": 92.5,
     "Valtteri Bottas": 92.3,
@@ -64,7 +64,7 @@ FP1_TIMES = {
 SPRINT_RESULT = []
 
 DRIVER_EXPERIENCE = {
-    "Kimi Antonelli":     {"f1_seasons": 1,  "career_poles": 2,  "r1_finish": 2,  "r2_finish": 1},
+    "Andrea Kimi Antonelli":     {"f1_seasons": 1,  "career_poles": 2,  "r1_finish": 2,  "r2_finish": 1},
     "George Russell":     {"f1_seasons": 7,  "career_poles": 5,  "r1_finish": 1,  "r2_finish": 2},
     "Oscar Piastri":      {"f1_seasons": 3,  "career_poles": 2},
     "Charles Leclerc":    {"f1_seasons": 7,  "career_poles": 26, "r1_finish": 3,  "r2_finish": 4},
@@ -81,7 +81,7 @@ DRIVER_EXPERIENCE = {
     "Franco Colapinto":   {"f1_seasons": 1,  "career_poles": 0,  "r1_finish": 14, "r2_finish": 10},
     "Carlos Sainz":       {"f1_seasons": 10, "career_poles": 6,  "r2_finish": 9},
     "Alex Albon":         {"f1_seasons": 5,  "career_poles": 0,  "r1_finish": 12},
-    "Oliver Bearman":     {"f1_seasons": 1,  "career_poles": 0,  "r1_finish": 7,  "r2_finish": 5},
+    "Ollie Bearman":     {"f1_seasons": 1,  "career_poles": 0,  "r1_finish": 7,  "r2_finish": 5},
     "Sergio Perez":       {"f1_seasons": 14, "career_poles": 3,  "r1_finish": 15, "r2_finish": 15},
     "Valtteri Bottas":    {"f1_seasons": 13, "career_poles": 20, "r2_finish": 13},
     "Fernando Alonso":    {"f1_seasons": 22, "career_poles": 22, "r1_finish": 16},

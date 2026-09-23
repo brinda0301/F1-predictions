@@ -2,7 +2,7 @@
   "result": [
     {
       "pos": 1,
-      "driver": "Kimi Antonelli",
+      "driver": "Andrea Kimi Antonelli",
       "team": "",
       "status": "Finished"
     },
@@ -26,37 +26,37 @@
     },
     {
       "pos": 5,
-      "driver": "Lewis Hamilton",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 6,
       "driver": "Lando Norris",
       "team": "",
       "status": "Finished"
     },
     {
+      "pos": 6,
+      "driver": "Lewis Hamilton",
+      "team": "",
+      "status": "Finished"
+    },
+    {
       "pos": 7,
-      "driver": "Max Verstappen",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 8,
-      "driver": "Fernando Alonso",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 9,
       "driver": "Pierre Gasly",
       "team": "",
       "status": "Finished"
     },
     {
+      "pos": 8,
+      "driver": "Max Verstappen",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 9,
+      "driver": "Liam Lawson",
+      "team": "",
+      "status": "Finished"
+    },
+    {
       "pos": 10,
-      "driver": "Sergio Perez",
+      "driver": "Esteban Ocon",
       "team": "",
       "status": "Finished"
     },
@@ -68,69 +68,69 @@
     },
     {
       "pos": 12,
-      "driver": "Valtteri Bottas",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 13,
-      "driver": "Lance Stroll",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 14,
       "driver": "Isack Hadjar",
       "team": "",
       "status": "Finished"
     },
     {
-      "pos": 15,
-      "driver": "Alex Albon",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 16,
-      "driver": "Oliver Bearman",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 17,
-      "driver": "Carlos Sainz",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 18,
+      "pos": 13,
       "driver": "Gabriel Bortoleto",
       "team": "",
       "status": "Finished"
     },
     {
-      "pos": 19,
+      "pos": 14,
       "driver": "Arvid Lindblad",
       "team": "",
       "status": "Finished"
     },
     {
-      "pos": 20,
-      "driver": "Esteban Ocon",
+      "pos": 15,
+      "driver": "Carlos Sainz",
       "team": "",
       "status": "Finished"
     },
     {
-      "pos": 21,
-      "driver": "Liam Lawson",
-      "team": "",
-      "status": "Finished"
-    },
-    {
-      "pos": 22,
+      "pos": 16,
       "driver": "Franco Colapinto",
       "team": "",
       "status": "Finished"
+    },
+    {
+      "pos": 17,
+      "driver": "Sergio Perez",
+      "team": "",
+      "status": "Finished"
+    },
+    {
+      "pos": 18,
+      "driver": "Fernando Alonso",
+      "team": "",
+      "status": "Lapped"
+    },
+    {
+      "pos": 19,
+      "driver": "Valtteri Bottas",
+      "team": "",
+      "status": "Lapped"
+    },
+    {
+      "pos": 20,
+      "driver": "Alex Albon",
+      "team": "",
+      "status": "Lapped"
+    },
+    {
+      "pos": 21,
+      "driver": "Lance Stroll",
+      "team": "",
+      "status": "Retired"
+    },
+    {
+      "pos": 22,
+      "driver": "Ollie Bearman",
+      "team": "",
+      "status": "Retired"
     }
   ]
 }

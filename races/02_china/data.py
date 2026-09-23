@@ -27,7 +27,7 @@ RACE_INFO = {
 
 # Qualifying results (March 14 2026)
 GRID = [
-    {"pos": 1,  "driver": "Kimi Antonelli",      "team": "Mercedes",      "q_time": 92.064},
+    {"pos": 1,  "driver": "Andrea Kimi Antonelli",      "team": "Mercedes",      "q_time": 92.064},
     {"pos": 2,  "driver": "George Russell",       "team": "Mercedes",      "q_time": 92.286},
     {"pos": 3,  "driver": "Lewis Hamilton",       "team": "Ferrari",       "q_time": 92.415},
     {"pos": 4,  "driver": "Charles Leclerc",      "team": "Ferrari",       "q_time": 92.428},
@@ -36,7 +36,7 @@ GRID = [
     {"pos": 7,  "driver": "Pierre Gasly",         "team": "Alpine",        "q_time": 92.873},
     {"pos": 8,  "driver": "Max Verstappen",       "team": "Red Bull",      "q_time": 93.002},
     {"pos": 9,  "driver": "Isack Hadjar",         "team": "Red Bull",      "q_time": 93.121},
-    {"pos": 10, "driver": "Oliver Bearman",       "team": "Haas",          "q_time": 93.292},
+    {"pos": 10, "driver": "Ollie Bearman",       "team": "Haas",          "q_time": 93.292},
     {"pos": 11, "driver": "Nico Hulkenberg",      "team": "Audi",          "q_time": 93.350},
     {"pos": 12, "driver": "Franco Colapinto",     "team": "Alpine",        "q_time": 93.355},
     {"pos": 13, "driver": "Esteban Ocon",         "team": "Haas",          "q_time": 93.550},
@@ -54,12 +54,12 @@ GRID = [
 # FP1 results (only practice session, sprint weekend)
 FP1_TIMES = {
     "George Russell":      92.741,
-    "Kimi Antonelli":      92.861,
+    "Andrea Kimi Antonelli":      92.861,
     "Lando Norris":        93.296,
     "Oscar Piastri":       93.350,
     "Charles Leclerc":     93.400,
     "Lewis Hamilton":      93.500,
-    "Oliver Bearman":      93.600,
+    "Ollie Bearman":      93.600,
     "Max Verstappen":      93.700,
     "Nico Hulkenberg":     93.750,
     "Pierre Gasly":        93.800,
@@ -83,10 +83,10 @@ SPRINT_RESULT = [
     {"pos": 2,  "driver": "Charles Leclerc",  "team": "Ferrari"},
     {"pos": 3,  "driver": "Lewis Hamilton",   "team": "Ferrari"},
     {"pos": 4,  "driver": "Lando Norris",     "team": "McLaren"},
-    {"pos": 5,  "driver": "Kimi Antonelli",   "team": "Mercedes"},  # Had 10s penalty, recovered
+    {"pos": 5,  "driver": "Andrea Kimi Antonelli",   "team": "Mercedes"},  # Had 10s penalty, recovered
     {"pos": 6,  "driver": "Oscar Piastri",    "team": "McLaren"},
     {"pos": 7,  "driver": "Pierre Gasly",     "team": "Alpine"},
-    {"pos": 8,  "driver": "Oliver Bearman",   "team": "Haas"},
+    {"pos": 8,  "driver": "Ollie Bearman",   "team": "Haas"},
     {"pos": 9,  "driver": "Max Verstappen",   "team": "Red Bull"},  # Fell back then recovered
     {"pos": 10, "driver": "Isack Hadjar",     "team": "Red Bull"},
 ]
@@ -94,7 +94,7 @@ SPRINT_RESULT = [
 # Driver experience (carried from Australia, updated with R1 results)
 DRIVER_EXPERIENCE = {
     "George Russell":     {"f1_seasons": 7,  "career_poles": 5,  "r1_finish": 1},
-    "Kimi Antonelli":     {"f1_seasons": 1,  "career_poles": 1,  "r1_finish": 2},
+    "Andrea Kimi Antonelli":     {"f1_seasons": 1,  "career_poles": 1,  "r1_finish": 2},
     "Isack Hadjar":       {"f1_seasons": 0,  "career_poles": 0,  "r1_finish": None},  # DNF
     "Charles Leclerc":    {"f1_seasons": 7,  "career_poles": 26, "r1_finish": 3},
     "Oscar Piastri":      {"f1_seasons": 3,  "career_poles": 2,  "r1_finish": None},  # DNS
@@ -104,7 +104,7 @@ DRIVER_EXPERIENCE = {
     "Arvid Lindblad":     {"f1_seasons": 0,  "career_poles": 0,  "r1_finish": 8},
     "Gabriel Bortoleto":  {"f1_seasons": 0,  "career_poles": 0,  "r1_finish": 9},
     "Nico Hulkenberg":    {"f1_seasons": 14, "career_poles": 1,  "r1_finish": None},  # DNS
-    "Oliver Bearman":     {"f1_seasons": 1,  "career_poles": 0,  "r1_finish": 7},
+    "Ollie Bearman":     {"f1_seasons": 1,  "career_poles": 0,  "r1_finish": 7},
     "Esteban Ocon":       {"f1_seasons": 8,  "career_poles": 0,  "r1_finish": 11},
     "Pierre Gasly":       {"f1_seasons": 8,  "career_poles": 0,  "r1_finish": 10},
     "Alex Albon":         {"f1_seasons": 5,  "career_poles": 0,  "r1_finish": 12},
