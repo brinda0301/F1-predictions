@@ -245,7 +245,7 @@ with tab_race:
                 st.markdown(f"""
                 <div style="background:#111128;border:2px solid {xgb_color}88;border-radius:12px;padding:24px;text-align:center;height:340px;">
                     <div style="font-size:10px;letter-spacing:3px;color:#FFD700;font-weight:900;">XGBOOST WINNER</div>
-                    <div style="font-size:9px;color:#666;margin-top:2px;">{rows} TRAINING ROWS | MAE {mae}</div>
+                    <div style="font-size:9px;color:#666;margin-top:2px;">{rows} TRAINING ROWS | TRAINING MAE {mae} | HELD-OUT 3.93</div>
                     <div style="font-size:46px;margin-top:8px;">🥇</div>
                     <div style="font-size:22px;font-weight:900;color:white;font-family:monospace;margin-top:6px;">{xgb_top['driver']}</div>
                     <div style="font-size:13px;color:{xgb_color};margin-top:2px;">{xgb_top['team']}</div>
