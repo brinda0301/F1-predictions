@@ -34,40 +34,73 @@
       "round": 1,
       "race": "Australia",
       "predicted_winner": "George Russell",
-      "predicted_win_pct": 59.1,
+      "predicted_win_pct": 32.61,
       "actual_winner": "George Russell",
       "correct": true,
-      "podium_overlap": 2
+      "podium_predicted": [
+        "George Russell",
+        "Lewis Hamilton",
+        "Charles Leclerc"
+      ],
+      "podium_actual": [
+        "George Russell",
+        "Andrea Kimi Antonelli",
+        "Charles Leclerc"
+      ],
+      "podium_overlap": 2,
+      "mean_position_error": 0.67
     },
     {
       "round": 2,
       "race": "China",
       "predicted_winner": "Lewis Hamilton",
-      "predicted_win_pct": 55.25,
+      "predicted_win_pct": 59.78,
       "actual_winner": "Andrea Kimi Antonelli",
       "correct": false,
-      "podium_overlap": 3
+      "podium_predicted": [
+        "Lewis Hamilton",
+        "George Russell",
+        "Charles Leclerc"
+      ],
+      "podium_actual": [
+        "Andrea Kimi Antonelli",
+        "George Russell",
+        "Lewis Hamilton"
+      ],
+      "podium_overlap": 2,
+      "mean_position_error": 1.0
     },
     {
       "round": 3,
       "race": "Japan",
       "predicted_winner": "Andrea Kimi Antonelli",
-      "predicted_win_pct": 40.11,
+      "predicted_win_pct": 49.28,
       "actual_winner": "Andrea Kimi Antonelli",
       "correct": true,
-      "podium_overlap": 1
+      "podium_predicted": [
+        "Andrea Kimi Antonelli",
+        "George Russell",
+        "Lewis Hamilton"
+      ],
+      "podium_actual": [
+        "Andrea Kimi Antonelli",
+        "Oscar Piastri",
+        "Charles Leclerc"
+      ],
+      "podium_overlap": 1,
+      "mean_position_error": 1.67
     },
     {
       "round": 4,
       "race": "Miami",
       "predicted_winner": "Andrea Kimi Antonelli",
-      "predicted_win_pct": 19.2,
+      "predicted_win_pct": 20.47,
       "actual_winner": "Andrea Kimi Antonelli",
       "correct": true,
       "podium_predicted": [
         "Andrea Kimi Antonelli",
-        "Max Verstappen",
-        "Lando Norris"
+        "Lando Norris",
+        "Max Verstappen"
       ],
       "podium_actual": [
         "Andrea Kimi Antonelli",
@@ -75,7 +108,7 @@
         "Oscar Piastri"
       ],
       "podium_overlap": 2,
-      "mean_position_error": 0.36,
+      "mean_position_error": 0.67,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 1
     },
@@ -97,7 +130,7 @@
         "Max Verstappen"
       ],
       "podium_overlap": 1,
-      "mean_position_error": 0.45,
+      "mean_position_error": 11.0,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 1
     },
@@ -116,10 +149,10 @@
       "podium_actual": [
         "Andrea Kimi Antonelli",
         "Lewis Hamilton",
-        "Pierre Gasly"
+        "Isack Hadjar"
       ],
       "podium_overlap": 2,
-      "mean_position_error": 6.0,
+      "mean_position_error": 7.67,
       "xgb_winner_correct": true,
       "xgb_podium_overlap": 2
     },
@@ -141,7 +174,7 @@
         "Lando Norris"
       ],
       "podium_overlap": 2,
-      "mean_position_error": 0.18,
+      "mean_position_error": 4.33,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 3
     },
@@ -160,12 +193,12 @@
       "podium_actual": [
         "George Russell",
         "Max Verstappen",
-        "Lewis Hamilton"
+        "Andrea Kimi Antonelli"
       ],
-      "podium_overlap": 3,
-      "mean_position_error": 0.09,
+      "podium_overlap": 2,
+      "mean_position_error": 1.33,
       "xgb_winner_correct": true,
-      "xgb_podium_overlap": 1
+      "xgb_podium_overlap": 2
     },
     {
       "round": 9,
@@ -185,7 +218,7 @@
         "Lewis Hamilton"
       ],
       "podium_overlap": 2,
-      "mean_position_error": 0.36,
+      "mean_position_error": 5.33,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 2
     },
@@ -207,7 +240,7 @@
         "Max Verstappen"
       ],
       "podium_overlap": 2,
-      "mean_position_error": 0.36,
+      "mean_position_error": 0.67,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 3
     },
@@ -276,6 +309,28 @@
       "mean_position_error": 1.67,
       "xgb_winner_correct": false,
       "xgb_podium_overlap": 1
+    },
+    {
+      "round": 14,
+      "race": "Spain",
+      "predicted_winner": "Lando Norris",
+      "predicted_win_pct": 25.33,
+      "actual_winner": "Andrea Kimi Antonelli",
+      "correct": false,
+      "podium_predicted": [
+        "Lando Norris",
+        "Andrea Kimi Antonelli",
+        "George Russell"
+      ],
+      "podium_actual": [
+        "Andrea Kimi Antonelli",
+        "Max Verstappen",
+        "Lando Norris"
+      ],
+      "podium_overlap": 2,
+      "mean_position_error": 1.67,
+      "xgb_winner_correct": true,
+      "xgb_podium_overlap": 2
     }
   ]
 }
