@@ -69,6 +69,24 @@ Four races this season were decided by mechanical failure, not pace: Russell's p
 Weights adjust after each race based on prediction error. The learning rate decays each round, so early races cause bigger shifts.
  
 ## Model Improvements Shipped
+
+### Engine Fixes (R15)
+
+Two bugs found in the post-R14 audit, both unambiguous, both fixed:
+
+**DNF counted twice.** The simulation already sets a retired driver's
+performance to -1 and excludes them from the finishers, so they cannot win that
+run. Win probability was then discounted again by the same DNF rate. Teams with
+higher hand-set rates, Red Bull, Audi, Aston Martin and Cadillac, paid for
+retirement twice.
+
+**Pole sitter excluded from a random boost.** A mid-race boost loop ran
+`range(1, n)`. Index 0 is the pole sitter, so the one driver in clean air was
+the only one who could never receive it. Off-by-one.
+
+Predictions before R15 are not regenerated. `config.json` records the round
+where the engine changed so the accuracy history is not silently two models.
+
  
 ### DNF Discount (before R8)
  
@@ -253,6 +271,68 @@ After the race, write the result and score the round:
 python fetch_race_data.py 13_italy --round 13 --result --score
 ```
 
+## Backtest: 48 Races, 2024 and 2025
+
+`backtest.py` replays both prior seasons through the same feature model, scored
+leave-one-race-out so nothing is measured on data it trained on. It exists
+because 14 races cannot tell you whether a change helped: a two-race swing is
+noise, so every tuning decision up to R14 was a guess.
+
+Run it with `python backtest.py`. First run takes a few minutes and caches to
+`.backtest_cache/`; reruns are instant.
+
+### The result that reframes the project
+
+**The model picks the pole sitter in 45 of 48 races.** It disagrees three
+times, and of those it is right once and wrong once.
+
+| | winners |
+| --- | :---: |
+| Weighted-score model | 28/48 (58%) |
+| Always pick pole | 28/48 (58%) |
+
+Level, because 94% of the time they are the same prediction. Every feature in
+the model is either derived from qualifying pace or fixed per team, so nothing
+in it is capable of disagreeing with the grid. That is why a season of weight
+calibration produced no improvement: there was no independent prediction to
+improve.
+
+### Feature ablation
+
+Dropping each feature and re-measuring winner accuracy across all 48 races:
+
+| Dropped | Winners | Change |
+| --- | :---: | :---: |
+| `fuel_quality` | 29/48 | +1 |
+| `sprint_score` | 29/48 | +1 |
+| `tyre_management` | 29/48 | +1 |
+| 12 other features | 28/48 | 0 |
+| `quali_pace` | 27/48 | -1 |
+| `race_pace` | 27/48 | -1 |
+| `grid_win_rate` | 27/48 | -1 |
+
+Fifteen of eighteen features change nothing. Three are worth one race each.
+Three make it marginally worse by being included. Dropping every hand-set team
+constant at once gains a race and leaves MAE unchanged.
+
+### XGBoost over 48 races
+
+| | held-out MAE |
+| --- | :---: |
+| XGBoost | 3.26 positions |
+| Predict finish = grid slot | 3.09 positions |
+
+The same result as on the 2026 data, so it is not small-sample noise. A
+gradient-boosted model on 18 features loses to a one-line heuristic.
+
+### What this changes
+
+Accuracy does not come from tuning. It comes from a feature that is independent
+of qualifying pace, and the model currently has none. Candidates worth testing:
+long-run practice pace, tyre strategy divergence, circuit-specific overtaking
+rates, pit-lane time loss. Each can now be measured against 48 races in about
+four minutes instead of one data point per fortnight.
+
 ## Project Structure
  
 ```
@@ -261,6 +341,7 @@ F1-predictions/
 ├── app.py                 Local dashboard, runs predictions
 ├── app_public.py          Public read-only dashboard, deployed to Streamlit Cloud
 ├── fetch_race_data.py     Timing API pipeline: grid, sprint, penalties, results, scoring
+├── backtest.py            Replays 2024-2025, leave-one-race-out scoring and feature ablation
 ├── config.json            Feature weights, accuracy history, regulation params
 ├── requirements.txt
 └── races/
@@ -280,7 +361,9 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
  
 - **Fix the engine bugs from the audit**: double-counted DNF, the recovery bonus that rewards starting further back, the pole sitter excluded from the random boost, and the reliability feature. These change future predictions only; published predictions are never regenerated
 - **Tests**: three would have caught the bugs above before they shipped. Penalty reordering against a known published grid, name reconciliation against the three known mismatches, and a schema check that every grid driver appears in `FP1_TIMES` or is explicitly absent
-- **Backtest harness**: replay the model against 2024 and 2025 seasons to validate across 60-plus races instead of 12. This is the top priority. At the current sample size the gap against the pole baseline is not statistically distinguishable from zero, so no accuracy claim here is worth much until the sample grows
+- **Find a feature independent of qualifying pace**. This is now the whole problem. The backtest shows the model reproduces the grid in 94% of races because every feature is either derived from qualifying or fixed per team. Candidates: long-run practice pace, tyre strategy divergence, circuit overtaking rates, pit-lane time loss. Each is testable against 48 races in minutes
+- **Cut the dead features**. Fifteen of eighteen change nothing across 48 races, and three make results marginally worse. Removing them costs no accuracy and makes the remainder interpretable
+- **Settle the recovery term and the reliability feature with the harness**. Both are known-wrong but their replacements are design choices, and the backtest can now measure which version is better rather than leaving it to opinion
 - **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
 - **Brier score logging**: track probability calibration quality with a single number after each race
 - **XGBoost accuracy history**: log XGBoost results to config so the season chart shows both models
@@ -289,7 +372,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Refresh hand-set team constants**: `ENERGY_READINESS`, `START_PROCEDURE`, `tyre_management` and `circuit_fit` are set by hand and rarely revisited. At R13 they held Alpine down while measured pace put the car on pole. Priors should decay toward measured performance as the season provides evidence
 - **Practice-pace fallback**: a driver missing from `FP1_TIMES` scores 0.3, a low value, so sitting out a session for a rookie run reads as slowness. The median of drivers who did run would treat absence as no information instead of bad information
 - **Dead XGBoost features**: at R12 the model assigned `race_pace` and `tyre_management` zero importance, while `tyre_compound_fit` and `energy_score` together carried 51%. With 235 rows at max_depth 3, that concentration needs investigating before more features are added
-Next race: Azerbaijan GP, Baku, September 25 to 27, 2026.
+Next race: Azerbaijan GP, Baku, September 25 to 27, 2026. Backtest covers 2024 and 2025, 48 races.
  
 ---
 Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/marianaantaya/).
