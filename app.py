@@ -175,7 +175,7 @@ with col_xgb:
         st.markdown(f"""
         <div style="background:#111128;border:2px solid {xgb_color}88;border-radius:12px;padding:24px;text-align:center;height:340px;">
             <div style="font-size:10px;letter-spacing:3px;color:#FFD700;font-weight:900;">XGBOOST WINNER</div>
-            <div style="font-size:9px;color:#666;margin-top:2px;">{rows} TRAINING ROWS | MAE {mae}</div>
+            <div style="font-size:9px;color:#666;margin-top:2px;">{rows} TRAINING ROWS | TRAINING MAE {mae} | HELD-OUT 3.93</div>
             <div style="font-size:46px;margin-top:8px;">🥇</div>
             <div style="font-size:22px;font-weight:900;color:white;font-family:monospace;margin-top:6px;">{xgb_top['driver']}</div>
             <div style="font-size:13px;color:{xgb_color};margin-top:2px;">{xgb_top['team']}</div>
@@ -344,7 +344,7 @@ if xgb and xgb.get("available"):
         st.markdown(f"""
         <div style="background:#111128;border:1px solid rgba(255,215,0,0.4);border-radius:10px;padding:18px;height:170px;">
             <div style="font-size:10px;letter-spacing:2px;color:#FFD700;">XGBOOST</div>
-            <div style="font-size:11px;color:#666;">Data-driven | trained on {xgb['trained_rows']} rows | MAE {xgb['mae']}</div>
+            <div style="font-size:11px;color:#666;">Data-driven | trained on {xgb['trained_rows']} rows | training MAE {xgb['mae']} | held-out MAE 3.93 vs 3.37 for finish-equals-grid</div>
             <div style="font-size:20px;font-weight:900;color:white;font-family:monospace;margin-top:10px;">{xgb_top['driver']}</div>
             <div style="font-size:12px;color:{TEAM_COLORS.get(xgb_top['team'],'#888')};">{xgb_top['team']}</div>
             <div style="font-size:28px;font-weight:900;color:#FFD700;font-family:monospace;margin-top:8px;">P{xgb_top['predicted_position']}</div>

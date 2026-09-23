@@ -16,22 +16,26 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
  
 | Round | Race | Monte Carlo | XGBoost | Actual | MC | XGB |
 | :---: | --- | --- | --- | --- | :---: | :---: |
-| 1 | Australian GP | Russell (59.1%) | n/a | Russell | Correct | n/a |
-| 2 | Chinese GP | Hamilton (55.25%) | n/a | Antonelli | Miss | n/a |
-| 3 | Japanese GP | Antonelli (40.11%) | n/a | Antonelli | Correct | n/a |
-| 4 | Miami GP | Antonelli (19.2%) | Norris | Antonelli | Correct | Miss |
-| 5 | Canadian GP | Russell (41.1%) | Russell | Antonelli | Miss | Miss |
-| 6 | Monaco GP | Hamilton (27.16%) | Antonelli (68.9%) | Antonelli | Miss | Correct |
-| 7 | Barcelona-Catalunya GP | Hamilton (28.27%) | Russell (34.8%) | Hamilton | Correct | Miss |
-| 8 | Austrian GP | Russell (48.21%) | Russell (35.1%) | Russell | Correct | Correct |
-| 9 | British GP | Antonelli (48.84%) | Antonelli (57.4%) | Leclerc | Miss | Miss |
-| 10 | Belgian GP | Antonelli (34.45%) | Verstappen (44.18%) | Antonelli | Correct | Miss |
-| 11 | Hungarian GP | Hamilton (29.82%) | Hamilton | Norris | Miss | Miss |
-| 12 | Dutch GP | Norris (36.0%) | Norris (42.69%) | Norris | Correct | Correct |
-| 13 | Italian GP | Russell (15.48%) | Russell (49.54%) | Antonelli | Miss | Miss |
-| 14 | Spanish GP | Norris (25.33%) | Antonelli (40.0%) | pending | pending | pending |
+| 1 | Australian GP | George Russell (32.61%) | n/a | George Russell | Correct | n/a |
+| 2 | Chinese GP | Lewis Hamilton (59.78%) | n/a | Kimi Antonelli | Miss | n/a |
+| 3 | Japanese GP | Kimi Antonelli (49.28%) | n/a | Kimi Antonelli | Correct | n/a |
+| 4 | Miami GP | Kimi Antonelli (20.47%) | Lando Norris | Kimi Antonelli | Correct | Miss |
+| 5 | Canadian GP | George Russell (40.07%) | George Russell | Kimi Antonelli | Miss | Miss |
+| 6 | Monaco GP | Lewis Hamilton (27.16%) | Kimi Antonelli | Kimi Antonelli | Miss | Correct |
+| 7 | Spanish GP (Barcelona) | Lewis Hamilton (28.27%) | George Russell | Lewis Hamilton | Correct | Miss |
+| 8 | Austrian GP | George Russell (48.21%) | George Russell | George Russell | Correct | Correct |
+| 9 | British GP | Kimi Antonelli (48.84%) | Kimi Antonelli | Charles Leclerc | Miss | Miss |
+| 10 | Belgian GP | Kimi Antonelli (34.45%) | Max Verstappen | Kimi Antonelli | Correct | Miss |
+| 11 | Hungarian GP | Lewis Hamilton (29.82%) | Lewis Hamilton | Lando Norris | Miss | Miss |
+| 12 | Dutch GP | Lando Norris (36.0%) | Lando Norris | Lando Norris | Correct | Correct |
+| 13 | Italian GP | George Russell (15.48%) | George Russell | Kimi Antonelli | Miss | Miss |
+| 14 | Spanish GP (Madring) | Lando Norris (25.33%) | Kimi Antonelli | Kimi Antonelli | Miss | Correct |
  
-**After 13 scored races**: Monte Carlo 7/13 winners correct (54%). XGBoost 3/10 since debut (30%). Average podium drivers hit: 2.0 of 3.
+**After 14 scored races**: Monte Carlo 7/14 winners correct (50%). XGBoost 4/11 since debut (36%). Average podium drivers hit: 1.86 of 3.
+
+**The baseline it has to beat**: always picking the pole sitter gets 9/14 (64%). The model is 14.3 points behind. At 14 races a two-race gap is well inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute.
+
+**These numbers were wrong until R14.** Results for R1-R9 were hand-entered and the midfield was 4-7 places out, up to 16 in places. Winners were right throughout, so the headline accuracy never moved, but two podiums were scored 3/3 that were really 2/3, and several mean position errors were badly understated: Canada was recorded as 0.45 and is 11.0, Britain as 0.36 and is 5.33. Every result is now pulled from the official timing API and verified against it. See Three Silent Data Bugs below.
 
 **The baseline it has to beat**: always picking the pole sitter gets 9/13 (69%). The model is 15.4 points behind. At 13 races a two-race gap is well inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute. Beating it over a full season is the goal; the backtest in the roadmap is what makes that measurable.
 
@@ -103,9 +107,9 @@ Two flaws surfaced at once, both measurable from the feature dump.
 
 **Stale hand-set constants beat live measurement.** Gasly reads `quali_pace` 1.0 and `race_pace` 1.0, the maximum on both. But `energy_score` 0.6, `tyre_management` 0.6, `pit_execution` 0.53 and `circuit_fit` 0.6 are hand-tuned Alpine priors from when the car was midfield. Those drag his model score to 0.7011 against Russell's 0.7268. When a team finds pace, the priors override the evidence, which is backwards.
 
-**Grid position barely registers.** Kimi Antonelli starts P22 after a power unit penalty and the model ranks him fourth at 9.72%, above the pole sitter. His `grid_win_rate` reads 0.0017 against Russell's 0.0788, so the feature reads the grid correctly. It carries 0.0717 weight, so an 18-place gap moves his score from 0.7268 to 0.6909. Moving him from P20 to P22 during a grid correction *raised* his win probability, from 9.21% to 9.72%.
+**Starting further back is rewarded, not merely under-penalised.** The Monte Carlo loop gives every driver outside the top five a recovery bonus that scales linearly with grid slot: P22 receives more than P20, and pole receives none at all. Antonelli started P22 and the model ranked him fourth at 9.72%, above the pole sitter. Moving him from P20 to P22 during a grid correction *raised* his win probability, from 9.21% to 9.72%, which is the signature of a bonus rather than a weak penalty.
 
-A model that improves a driver's chances when you move him further back is not weighting grid position enough. Same finding as Hungary, louder. The fix is track-dependent grid weighting, queued in the roadmap.
+This write-up originally blamed the `grid_win_rate` weight of 0.0717. That was wrong. A low weight would flatten the effect of grid position, not invert it. The recovery term is the cause, it is not track-dependent, and it applies the same boost at Monaco as at Monza.
 
 ### R12 Zandvoort: Best Race of the Season
 
@@ -161,6 +165,20 @@ That reconciliation matters more than it looks. The engine reads FP1 by grid nam
 
 FP1 is written all-or-nothing for the same reason, and the threshold had to be tightened twice. At Monza the API returned times for 18 of 22 drivers, which cleared an 80 percent gate. The four absent drivers had sat out FP1 for rookie runs, and one of them was the pole sitter. Scored on the 0.3 fallback, Gasly dropped from 7.07% to 4.12% and Verstappen from 10.14% to 5.98%, while Russell, Hamilton and Leclerc each gained roughly 3.3 points they had not earned. The gate now sits at 95 percent and the script names every grid driver missing a time.
 
+### The Audit
+
+A full pass over the repo after R14 found fourteen issues. The four that changed published numbers:
+
+**Hand-entered results.** R1-R9 were typed by hand and the midfield was 4-7 places out. Winners were correct throughout, so headline accuracy never moved, but XGBoost had been training on scrambled labels for nine of fourteen races, and `r1_finish` for each following race read from them. All results now come from the API and are verified against it.
+
+**In-sample MAE published as if it were prediction error.** See XGBoost Performance above.
+
+**DNF counted twice.** The simulation already prevents a retired driver from winning, then win probability is discounted again by the same DNF rate. Teams with higher hand-set rates are penalised twice over.
+
+**Reliability is not reliability.** The feature reads the previous race finishing position: top ten scores 0.95, anything lower 0.80, missing 0.50. Finishing eleventh on pace counts as unreliable, a crash that was not the driver's fault counts as unreliable, and a driver absent from the previous race takes the heaviest penalty of all.
+
+Also found: the pole sitter is excluded from a random boost every other driver can receive, because the loop starts at index 1; `practice_pace` defaults to 0.3 for a missing FP1 time, so skipping a session reads as being slow; DNFs are labelled two different ways in the training set; and the hand-set team constants have never been revisited, which is why Alpine was held down at Monza while measured pace put them on pole.
+
 ### Three Silent Data Bugs
 
 None of these threw an exception. Each was found by reading a published timing sheet against the generated file, and each changed the prediction.
@@ -178,42 +196,30 @@ The deeper issue lives in the engine, not the fetcher: `practice_pace` defaults 
 Hand-edited per race: weather forecast, circuit type, tyre compounds, circuit history. These carry over from the previous `data.py`, so a re-fetch no longer wipes tuning.
 
 ## XGBoost Performance
- 
+
+**Read the MAE column as training error, not prediction error.** It is computed on the same rows the model just fitted, so it measures memorisation. Held out properly, leave-one-race-out across all 14 rounds, the real figure is **3.93 positions**, eight times larger than the ~0.49 the table shows.
+
+**And it loses to the naive baseline.** Predicting that every driver finishes exactly where they started scores **3.37 positions**. XGBoost scores 3.93. On honest data it is worse than assuming nobody overtakes.
+
+That comparison was hidden until the results were fixed. Measured against the old hand-entered results it appeared to win, 3.45 against 3.81, because both the labels it trained on and the labels it was scored against carried the same errors. Correcting the data reversed the finding.
+
+The in-sample number rising across the season, 0.29 up to 0.49, is not evidence of anything either. Training error creeping up as the dataset grows is ordinary regularisation.
+
+Fixing this means either better features or accepting that 279 rows of 18 features cannot beat a one-line heuristic. The backtest is what decides which.
+
 | Round | Pick | Actual | Winner | Podium Hits | Training Rows | MAE |
 | :---: | --- | --- | :---: | :---: | :---: | :---: |
-| 4 | Norris | Antonelli | Miss | 2/3 | 66 | 0.292 |
-| 5 | Russell | Antonelli | Miss | 1/3 | 88 | 0.280 |
-| 6 | Antonelli | Antonelli | Correct | 2/3 | 110 | 0.303 |
-| 7 | Russell | Hamilton | Miss | 3/3 | 125 | 0.357 |
-| 8 | Russell | Russell | Correct | 2/3 | 147 | 0.331 |
-| 9 | Antonelli | Leclerc | Miss | 2/3 | 169 | 0.336 |
-| 10 | Verstappen | Antonelli | Miss | 3/3 | 191 | 0.321 |
-| 11 | Hamilton | Norris | Miss | 1/3 | 213 | 0.316 |
-| 12 | Norris | Norris | Correct | 2/3 | 235 | 0.396 |
-| 13 | Russell | Antonelli | Miss | 1/3 | 257 | 0.421 |
-| 14 | Antonelli | pending | pending | pending | 279 | 0.486 |
- 
-## 2026 Regulation Constants
- 
-| Constant | Value | What Changed |
-| --- | :---: | --- |
-| POLE_WIN_RATE | 0.45 | Active aero replaced DRS |
-| DIRTY_AIR_RETENTION | 0.90 | Cars keep 90% downforce when following, up from 70% |
-| OVERTAKE_BOOST | 1.4 | Overtake Mode replaces DRS |
-| ENERGY_NOISE | 0.06 | 350kW MGU-K, 50/50 power split |
-| WEIGHT_VARIANCE | 0.015 | Cars 76kg lighter at 724kg |
- 
-## Setup
- 
-```bash
-git clone https://github.com/brinda0301/F1-predictions.git
-cd F1-predictions
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
- 
-## Usage
+| 4 | Lando Norris | Kimi Antonelli | Miss | 1/3 | 66 | 0.292 |
+| 5 | George Russell | Kimi Antonelli | Miss | 1/3 | 88 | 0.28 |
+| 6 | Kimi Antonelli | Kimi Antonelli | Correct | 2/3 | 110 | 0.303 |
+| 7 | George Russell | Lewis Hamilton | Miss | 3/3 | 125 | 0.357 |
+| 8 | George Russell | George Russell | Correct | 2/3 | 147 | 0.331 |
+| 9 | Kimi Antonelli | Charles Leclerc | Miss | 2/3 | 169 | 0.336 |
+| 10 | Max Verstappen | Kimi Antonelli | Miss | 3/3 | 191 | 0.321 |
+| 11 | Lewis Hamilton | Lando Norris | Miss | 1/3 | 213 | 0.316 |
+| 12 | Lando Norris | Lando Norris | Correct | 2/3 | 235 | 0.396 |
+| 13 | George Russell | Kimi Antonelli | Miss | 1/3 | 257 | 0.421 |
+| 14 | Kimi Antonelli | Kimi Antonelli | Correct | 2/3 | 279 | 0.486 |
 
 Build the race file. The folder is created automatically.
 
@@ -272,6 +278,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
  
 ## Roadmap
  
+- **Fix the engine bugs from the audit**: double-counted DNF, the recovery bonus that rewards starting further back, the pole sitter excluded from the random boost, and the reliability feature. These change future predictions only; published predictions are never regenerated
 - **Tests**: three would have caught the bugs above before they shipped. Penalty reordering against a known published grid, name reconciliation against the three known mismatches, and a schema check that every grid driver appears in `FP1_TIMES` or is explicitly absent
 - **Backtest harness**: replay the model against 2024 and 2025 seasons to validate across 60-plus races instead of 12. This is the top priority. At the current sample size the gap against the pole baseline is not statistically distinguishable from zero, so no accuracy claim here is worth much until the sample grows
 - **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
