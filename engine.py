@@ -621,7 +621,10 @@ def predict(race_folder, config=None):
                 recovery *= DIRTY_AIR_RETENTION
                 perf[i] += recovery
 
-        for i in range(1, n):
+        # range(1, n) skipped index 0, which is the pole sitter, so the one
+        # driver on the cleanest air was the only one who could never receive
+        # this boost. Off-by-one, fixed R15.
+        for i in range(n):
             if np.random.random() < 0.15:
                 perf[i] += 0.025
 
@@ -664,17 +667,11 @@ def predict(race_folder, config=None):
         })
     results.sort(key=lambda x: x["win_pct"], reverse=True)
 
-    # DNF discount: winners must finish
-    for r in results:
-        discount = 1 - (r["dnf_pct"] / 100)
-        r["win_pct"] = round(r["win_pct"] * discount, 2)
-
-    # Renormalize so win_pct sums to 100
-    total_win = sum(r["win_pct"] for r in results)
-    if total_win > 0:
-        for r in results:
-            r["win_pct"] = round(r["win_pct"] * 100 / total_win, 2)
-    results.sort(key=lambda x: x["win_pct"], reverse=True)
+    # DNF is already handled inside the simulation: a retired driver has
+    # perf set to -1 and is excluded from `finishers`, so they cannot win that
+    # run. An earlier version multiplied win_pct by (1 - dnf_pct) here as well,
+    # which charged every driver for retirement twice and penalised teams with
+    # higher hand-set DNF_RATES far more than intended. Removed R15.
     
     # --- XGBoost (added R4) ---
     xgb_result = xgboost_predict(race_folder)
@@ -873,4 +870,3 @@ if __name__ == "__main__":
         print("\nXGBoost not installed. Run: pip install xgboost")
 
     print(f"\nSimulations: {out['simulations']:,}")
-    

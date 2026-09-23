@@ -32,3 +32,4 @@ data/f1_cache/
 .fastf1_cache/
 
 __pycache__/
+.backtest_cache/

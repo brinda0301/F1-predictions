@@ -332,5 +332,17 @@
       "xgb_winner_correct": true,
       "xgb_podium_overlap": 2
     }
+  ],
+  "engine_versions": [
+    {
+      "from_round": 1,
+      "to_round": 14,
+      "notes": "Original engine. DNF penalty applied twice; pole sitter excluded from the random mid-race boost."
+    },
+    {
+      "from_round": 15,
+      "to_round": null,
+      "notes": "R15 fixes: removed duplicate DNF discount, included pole sitter in the random boost. Predictions before R15 are not regenerated."
+    }
   ]
 }
