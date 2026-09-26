@@ -39,6 +39,7 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
 | 12 | Dutch GP | Lando Norris (36.0%) | Lando Norris | Lando Norris | Correct | Correct |
 | 13 | Italian GP | George Russell (15.48%) | George Russell | Kimi Antonelli | Miss | Miss |
 | 14 | Spanish GP (Madring) | Lando Norris (25.33%) | Kimi Antonelli | Kimi Antonelli | Miss | Correct |
+| 15 | Azerbaijan GP | George Russell (90.25%) | George Russell | pending | - | - |
  
 **After 14 scored races**: Monte Carlo 7/14 winners correct (50%). XGBoost 4/11 since debut (36%). Average podium drivers hit: 1.86 of 3.
 
@@ -109,7 +110,39 @@ The model used a single temperature (0.11) for every circuit. Monaco should not 
 | Wet | 0.18 | Wide spread, more chaos |
  
 ## Key Race Analyses
- 
+
+### R15 Baku: The Most Confident Call of the Season, and Why That Is a Warning
+
+Russell took pole by 0.837s, the largest qualifying margin of 2026. Both models
+agree on him: Monte Carlo 90.25%, XGBoost a predicted finishing position of 1.63
+and a win probability of 78.2%. No other prediction this season has been above
+60%.
+
+The gap is real. The number attached to it is partly an artefact of a label
+typed by hand.
+
+Softmax temperature is set per circuit type: `street` 0.07, `high_speed` 0.10,
+`balanced` 0.12, `wet` 0.18. Baku is tagged `street`, the sharpest setting on the
+list, which concentrates probability on whoever leads the score ordering. The
+same driver, the same 0.837s, the same feature values under `balanced` produce a
+materially flatter distribution, because temperature divides the score gaps
+before the softmax. One word in `data.py` moves the headline number more than any
+feature weight in the model does.
+
+Baku deserves a low temperature for a defensible reason: passing is hard and
+qualifying carries. That is not the problem. The problem is that four hand-typed
+labels carry more influence over the published probability than the eighteen
+features the project is built around, and none of the four has been validated
+against a single race. The backtest harness can settle it by refitting
+temperature per track type over 48 races instead of accepting the values someone
+picked once. That is now on the roadmap.
+
+Two other things worth recording. Antonelli crashed in Q1 and starts P16 while
+leading the championship by 81 points, which is the kind of split between season
+form and grid slot the recovery term handles badly. And the penalty set here
+broke the grid builder: Sainz 5 places, Perez 3 places, both Aston Martins to the
+back for power unit components. See Four Silent Data Bugs.
+
 ### R13 Monza: The Flaw Called It Better Than the Model Did
 
 Antonelli won from the back of the grid, the first Italian to win at Monza since 1966. Monte Carlo picked Russell, who finished second, for a podium overlap of 2 and a mean position error of 1.67. XGBoost picked Russell too, overlap 1.
@@ -202,9 +235,11 @@ A full pass over the repo after R14 found fourteen issues. The four that changed
 
 Also found: the pole sitter is excluded from a random boost every other driver can receive, because the loop starts at index 1; `practice_pace` defaults to 0.3 for a missing FP1 time, so skipping a session reads as being slow; DNFs are labelled two different ways in the training set; and the hand-set team constants have never been revisited, which is why Alpine was held down at Monza while measured pace put them on pole.
 
-### Three Silent Data Bugs
+### Four Silent Data Bugs
 
 None of these threw an exception. Each was found by reading a published timing sheet against the generated file, and each changed the prediction.
+
+**A grid penalty deleted a driver.** Found at Baku, R15. Penalties apply to the qualifying position, so a drop can target a slot past the end of the grid. Perez qualified 20th and took three places, aiming at 23rd, with both Aston Martins already sent to the pit lane. The rebuild capped targets at the number of grid slots, so 23 fell outside the fill loop and Perez was written out of the grid entirely. The script returned 21 cars, printed no warning, and the engine ran on 21 drivers as though that were the entry list. Fixed by routing any overshooting penalty to the back of the non-pit-lane runners in penalised order, which is what the FIA does, and by a hard exit if the rebuilt grid does not contain every driver it started with. The exit guard matters more than the fix: the class of error is losing a driver, not this specific arithmetic.
 
 **Driver name mismatch across sources.** FastF1 writes "Kimi Antonelli", the timing API writes "Andrea Kimi Antonelli". Same for Oliver against Ollie Bearman and Alexander against Alex Albon. The engine looks FP1 up by grid name, so three drivers fell to the `practice_pace` fallback of 0.3. Antonelli had topped the session at Zandvoort and was scored as if slowest: 4.57% instead of 9.42%, off the predicted podium. He finished second. Fixed by reconciling names against the grid by surname.
 
@@ -212,7 +247,7 @@ None of these threw an exception. Each was found by reading a published timing s
 
 **Fastest lap read as latest session.** The original `best_lap` took Q3, then Q2, then Q1, assuming later sessions are quicker. Albon set 1:35.307 in Q1 and a slower 1:35.532 in Q2, so he was recorded two tenths off his real pace. Harmless at P16. The damaging case is a front-runner who banks a good Q2 lap and has Q3 ruined by a red flag, who would then be scored on the ruined lap. Fixed by taking the minimum across all three sessions.
 
-The pattern matters more than any single bug. All three produced plausible numbers, none produced an error, and all three were caught by eye rather than by anything automated. That is the strongest argument in this repo for the backtest: 60-plus races surface distortions that 13 races hide.
+The pattern matters more than any single bug. All four produced plausible numbers, none produced an error, and all four were caught by eye rather than by anything automated. That is the strongest argument in this repo for the backtest: 60-plus races surface distortions that 13 races hide.
 
 The deeper issue lives in the engine, not the fetcher: `practice_pace` defaults to 0.3, a low value, so a driver who did not run reads as a driver who was slow. Those are different things. Moving the default to the median of drivers who did run is on the roadmap.
 
@@ -342,11 +377,12 @@ four minutes instead of one data point per fortnight.
 
 `python test_pipeline.py` or `python -m pytest test_pipeline.py -v`
 
-Nine tests covering the three bug classes that reached production this season. Each of those bugs produced plausible numbers, threw no exception, and was caught by eye weeks later.
+Ten tests covering the bug classes that reached production this season. Each of those bugs produced plausible numbers, threw no exception, and was caught by eye weeks later.
 
 | Test | Bug it encodes |
 | --- | --- |
 | `test_penalty_reordering_matches_published_grid` | Grid penalties applied by hand, verified against the FIA's Hungary grid |
+| `test_penalty_overflow_keeps_every_driver` | A penalty targeting a slot past the end of the grid deleting a driver, Baku R15 |
 | `test_penalty_on_unknown_driver_fails_loudly` | A misspelled driver name silently doing nothing |
 | `test_no_grid_driver_is_shadowed_by_a_name_variant` | FastF1 and the API spelling three drivers differently, dropping them to the `practice_pace` fallback |
 | `test_name_reconciliation_maps_known_variants` | The mapping itself |
@@ -399,8 +435,9 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Ensemble layer**: across recent races XGBoost identifies podium drivers while ordering them wrong, and Monte Carlo orders better than it selects. Let XGBoost pick the podium set and Monte Carlo rank it
 - **Refresh hand-set team constants**: `ENERGY_READINESS`, `START_PROCEDURE`, `tyre_management` and `circuit_fit` are set by hand and rarely revisited. At R13 they held Alpine down while measured pace put the car on pole. Priors should decay toward measured performance as the season provides evidence
 - **Practice-pace fallback**: a driver missing from `FP1_TIMES` scores 0.3, a low value, so sitting out a session for a rookie run reads as slowness. The median of drivers who did run would treat absence as no information instead of bad information
+- **Fit softmax temperature instead of typing it**: the four per-track-type values, street 0.07 through wet 0.18, were set by hand and never tested. At Baku the label alone drives the headline confidence more than any feature weight does. Refit them over the 48 backtest races and report the held-out log loss for each candidate
 - **Dead XGBoost features**: at R12 the model assigned `race_pace` and `tyre_management` zero importance, while `tyre_compound_fit` and `energy_score` together carried 51%. With 235 rows at max_depth 3, that concentration needs investigating before more features are added
-Next race: Azerbaijan GP, Baku, September 25 to 27, 2026. Backtest covers 2024 and 2025, 48 races.
+R15 Azerbaijan predictions committed before lights out, September 26, 2026. Backtest covers 2024 and 2025, 48 races.
  
 ---
 Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/marianaantaya/).

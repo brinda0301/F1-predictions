@@ -81,6 +81,49 @@ def test_penalty_reordering_matches_published_grid():
     assert len(set(got)) == len(got), "duplicate driver on the grid"
 
 
+def test_penalty_overflow_keeps_every_driver():
+    """Baku R15. A penalty applies to the qualifying position, so a drop can
+    aim at a slot that does not exist. Perez qualified 20th and took three
+    places, targeting 23rd, with both Aston Martins already in the pit lane.
+    The old rebuild capped targets at the grid size, so 23 fell outside the
+    fill loop and Perez was written out of the grid with no warning: 21 cars
+    returned where 22 went in, and the engine ran on 21.
+    """
+    f = _fetcher()
+    qualifying = [
+        "George Russell", "Charles Leclerc", "Oscar Piastri", "Isack Hadjar",
+        "Max Verstappen", "Lando Norris", "Lewis Hamilton", "Pierre Gasly",
+        "Liam Lawson", "Nico Hulkenberg", "Arvid Lindblad", "Esteban Ocon",
+        "Franco Colapinto", "Gabriel Bortoleto", "Ollie Bearman",
+        "Andrea Kimi Antonelli", "Alex Albon", "Valtteri Bottas",
+        "Carlos Sainz", "Sergio Perez", "Fernando Alonso", "Lance Stroll",
+    ]
+    grid = [{"driver": n, "team": "x", "pos": i + 1, "q_time": 100.0 + i}
+            for i, n in enumerate(qualifying)]
+
+    out = f.apply_penalties(
+        grid,
+        {"Carlos Sainz": 5, "Sergio Perez": 3},
+        ["Fernando Alonso", "Lance Stroll"],
+    )
+    got = [d["driver"] for d in sorted(out, key=lambda x: x["pos"])]
+
+    assert len(got) == 22, f"grid lost drivers: {len(got)} of 22"
+    assert set(got) == set(qualifying), "grid membership changed"
+    assert len(set(got)) == len(got), "duplicate driver on the grid"
+    assert [d["pos"] for d in sorted(out, key=lambda x: x["pos"])] == list(range(1, 23))
+
+    # Twenty slots sit ahead of the two pit lane starters. Sainz aimed at 24th
+    # from 19th and Perez at 23rd from 20th, so both overshoot and both fall to
+    # the back of the runners, in qualifying order between themselves.
+    assert got[-4:] == [
+        "Carlos Sainz", "Sergio Perez", "Fernando Alonso", "Lance Stroll",
+    ], f"overflow placed wrong: {got[-4:]}"
+
+    # Every driver who was not penalised keeps their qualifying order and moves up.
+    assert got[:18] == qualifying[:18], "clean runners reordered"
+
+
 def test_penalty_on_unknown_driver_fails_loudly():
     """A typo in a driver name must stop the run, not silently do nothing."""
     f = _fetcher()
