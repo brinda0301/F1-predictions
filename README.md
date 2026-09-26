@@ -6,6 +6,8 @@ Predicts F1 race winners from timing data, commits every prediction to GitHub be
 
 That is the point of the repo. The interesting work is not the model, it is the measurement that showed the model adds nothing, and the diagnosis of why: every feature is either derived from qualifying pace or fixed per team, so nothing in it can disagree with the grid.
 
+R15 at Baku is the finding playing out live. The model made its most confident call of the season, 90.25% on the pole sitter, and he won. The baseline scored the same race. Podium overlap was 1 of 3 and the mean position error across the predicted top three was 4.0, the worst of the season. A correct winner from a prediction the baseline also makes is not evidence the model works.
+
 **Live dashboard: [f1-predictions-bb.streamlit.app](https://f1-predictions-bb.streamlit.app/)**
 
 ## What It Does
@@ -39,13 +41,13 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
 | 12 | Dutch GP | Lando Norris (36.0%) | Lando Norris | Lando Norris | Correct | Correct |
 | 13 | Italian GP | George Russell (15.48%) | George Russell | Kimi Antonelli | Miss | Miss |
 | 14 | Spanish GP (Madring) | Lando Norris (25.33%) | Kimi Antonelli | Kimi Antonelli | Miss | Correct |
-| 15 | Azerbaijan GP | George Russell (90.25%) | George Russell | pending | - | - |
+| 15 | Azerbaijan GP | George Russell (90.25%) | George Russell | George Russell | Correct | Correct |
  
-**After 14 scored races**: Monte Carlo 7/14 winners correct (50%). XGBoost 4/11 since debut (36%). Average podium drivers hit: 1.86 of 3.
+**After 15 scored races**: Monte Carlo 8/15 winners correct (53%). XGBoost 5/12 since debut (42%). Average podium drivers hit: 1.80 of 3.
 
-**The baseline it has to beat**: always picking the pole sitter gets 9/14 (64%). The model is 14.3 points behind. At 14 races a two-race gap is well inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute.
+**The baseline it has to beat**: always picking the pole sitter gets 10/15 (67%). The model is 13.4 points behind. Russell started on pole at Baku and won, so both the model and the baseline scored that race, and the gap did not move. At 15 races a two-race gap sits inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute.
 
-**These numbers were wrong until R14.** Results for R1-R9 were hand-entered and the midfield was 4-7 places out, up to 16 in places. Winners were right throughout, so the headline accuracy never moved, but two podiums were scored 3/3 that were really 2/3, and several mean position errors were badly understated: Canada was recorded as 0.45 and is 11.0, Britain as 0.36 and is 5.33. Every result is now pulled from the official timing API and verified against it. See Three Silent Data Bugs below.
+**These numbers were wrong until R14.** Results for R1-R9 were hand-entered and the midfield was 4-7 places out, up to 16 in places. Winners were right throughout, so the headline accuracy never moved, but two podiums were scored 3/3 that were really 2/3, and several mean position errors were badly understated: Canada was recorded as 0.45 and is 11.0, Britain as 0.36 and is 5.33. Every result is now pulled from the official timing API and verified against it. See Four Silent Data Bugs below.
 
 Four races this season were decided by mechanical failure, not pace: Russell's power unit at Canada, Antonelli's engine at Barcelona, Antonelli's wheel shield at Britain, Russell's retirement at Belgium. No model predicts a part breaking from qualifying data.
  
@@ -111,15 +113,34 @@ The model used a single temperature (0.11) for every circuit. Monaco should not 
  
 ## Key Race Analyses
 
-### R15 Baku: The Most Confident Call of the Season, and Why That Is a Warning
+### R15 Baku: Right Winner, Wrong Everything Else
 
 Russell took pole by 0.837s, the largest qualifying margin of 2026. Both models
-agree on him: Monte Carlo 90.25%, XGBoost a predicted finishing position of 1.63
-and a win probability of 78.2%. No other prediction this season has been above
-60%.
+called him: Monte Carlo 90.25%, XGBoost a predicted finishing position of 1.63
+and a win probability of 78.2%. No other prediction this season went above 60%.
 
-The gap is real. The number attached to it is partly an artefact of a label
-typed by hand.
+He won. The most confident call of the season landed.
+
+Read the rest of the distribution before treating that as a win for the model.
+
+| | Predicted | Finished |
+| --- | --- | --- |
+| Monte Carlo P1 | George Russell 90.25% | 1st |
+| Monte Carlo P2 | Charles Leclerc 2.18% | 4th |
+| Monte Carlo P3 | Oscar Piastri 1.3% | 13th |
+| Actual P2 | Max Verstappen, ranked 4th at 1.03% | 2nd from P8 on the grid |
+| Actual P3 | Isack Hadjar | 3rd from P4 |
+
+Podium overlap 1 of 3. Mean position error across the predicted top three: 4.0,
+the worst of the season. Antonelli started P16 after his Q1 crash and finished
+5th. Verstappen gained six places. Piastri started 3rd and finished 13th.
+
+So the model got the one name a coin-flip on the pole sitter would also have
+got, and missed both remaining podium slots by wide margins. The always-pole
+baseline scored this race too. A 90.25% call that agrees with the baseline adds
+no information, whatever the outcome.
+
+The confidence number itself is partly an artefact of a label typed by hand.
 
 Softmax temperature is set per circuit type: `street` 0.07, `high_speed` 0.10,
 `balanced` 0.12, `wet` 0.18. Baku is tagged `street`, the sharpest setting on the
@@ -137,11 +158,11 @@ against a single race. The backtest harness can settle it by refitting
 temperature per track type over 48 races instead of accepting the values someone
 picked once. That is now on the roadmap.
 
-Two other things worth recording. Antonelli crashed in Q1 and starts P16 while
-leading the championship by 81 points, which is the kind of split between season
-form and grid slot the recovery term handles badly. And the penalty set here
-broke the grid builder: Sainz 5 places, Perez 3 places, both Aston Martins to the
-back for power unit components. See Four Silent Data Bugs.
+One more thing worth recording. The penalty set here broke the grid builder:
+Sainz 5 places, Perez 3 places, both Aston Martins to the back for power unit
+components. The rebuild returned 21 cars for a 22-car grid and raised no error.
+See Four Silent Data Bugs. The grid that shipped was verified against the
+official classification after the race: all 22 slots match.
 
 ### R13 Monza: The Flaw Called It Better Than the Model Did
 
@@ -437,7 +458,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Practice-pace fallback**: a driver missing from `FP1_TIMES` scores 0.3, a low value, so sitting out a session for a rookie run reads as slowness. The median of drivers who did run would treat absence as no information instead of bad information
 - **Fit softmax temperature instead of typing it**: the four per-track-type values, street 0.07 through wet 0.18, were set by hand and never tested. At Baku the label alone drives the headline confidence more than any feature weight does. Refit them over the 48 backtest races and report the held-out log loss for each candidate
 - **Dead XGBoost features**: at R12 the model assigned `race_pace` and `tyre_management` zero importance, while `tyre_compound_fit` and `energy_score` together carried 51%. With 235 rows at max_depth 3, that concentration needs investigating before more features are added
-R15 Azerbaijan predictions committed before lights out, September 26, 2026. Backtest covers 2024 and 2025, 48 races.
+R15 Azerbaijan scored. Predictions were committed before lights out on September 26, 2026 and are unedited. Backtest covers 2024 and 2025, 48 races.
  
 ---
 Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/marianaantaya/).

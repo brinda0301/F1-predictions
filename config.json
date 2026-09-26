@@ -331,6 +331,28 @@
       "mean_position_error": 1.67,
       "xgb_winner_correct": true,
       "xgb_podium_overlap": 2
+    },
+    {
+      "round": 15,
+      "race": "Azerbaijan",
+      "predicted_winner": "George Russell",
+      "predicted_win_pct": 90.25,
+      "actual_winner": "George Russell",
+      "correct": true,
+      "podium_predicted": [
+        "George Russell",
+        "Charles Leclerc",
+        "Oscar Piastri"
+      ],
+      "podium_actual": [
+        "George Russell",
+        "Max Verstappen",
+        "Isack Hadjar"
+      ],
+      "podium_overlap": 1,
+      "mean_position_error": 4.0,
+      "xgb_winner_correct": true,
+      "xgb_podium_overlap": 2
     }
   ],
   "engine_versions": [

@@ -598,9 +598,15 @@ def main():
         if not results:
             sys.exit("No race results published yet.")
         if args.result:
+            # fetch_results already resolves the constructor through TEAMS.
+            # This writer used to hardcode "" here and discard it, which left
+            # every result.json without a team. Both dashboards read that field
+            # for the actual winner's label and colour, so the winner card
+            # rendered a blank team in the fallback gold instead of the team
+            # colour, on every race of the season. Fixed R15.
             payload = {"result": [
                 {"pos": r["pos"], "driver": r["driver"],
-                 "team": "", "status": r["status"]}
+                 "team": r["team"], "status": r["status"]}
                 for r in results
             ]}
             out = race_dir / "result.json"

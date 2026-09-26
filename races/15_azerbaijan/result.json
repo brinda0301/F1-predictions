@@ -2,38 +2,38 @@
   "result": [
     {
       "pos": 1,
-      "driver": "Charles Leclerc",
-      "team": "Ferrari",
-      "status": "Finished"
-    },
-    {
-      "pos": 2,
       "driver": "George Russell",
       "team": "Mercedes",
       "status": "Finished"
     },
     {
+      "pos": 2,
+      "driver": "Max Verstappen",
+      "team": "Red Bull",
+      "status": "Finished"
+    },
+    {
       "pos": 3,
-      "driver": "Lewis Hamilton",
-      "team": "Ferrari",
-      "status": "Finished"
-    },
-    {
-      "pos": 4,
-      "driver": "Lando Norris",
-      "team": "McLaren",
-      "status": "Finished"
-    },
-    {
-      "pos": 5,
       "driver": "Isack Hadjar",
       "team": "Red Bull",
       "status": "Finished"
     },
     {
+      "pos": 4,
+      "driver": "Charles Leclerc",
+      "team": "Ferrari",
+      "status": "Finished"
+    },
+    {
+      "pos": 5,
+      "driver": "Andrea Kimi Antonelli",
+      "team": "Mercedes",
+      "status": "Finished"
+    },
+    {
       "pos": 6,
-      "driver": "Liam Lawson",
-      "team": "Racing Bulls",
+      "driver": "Lewis Hamilton",
+      "team": "Ferrari",
       "status": "Finished"
     },
     {
@@ -44,38 +44,38 @@
     },
     {
       "pos": 8,
-      "driver": "Gabriel Bortoleto",
-      "team": "Audi",
+      "driver": "Esteban Ocon",
+      "team": "Haas",
       "status": "Finished"
     },
     {
       "pos": 9,
-      "driver": "Franco Colapinto",
-      "team": "Alpine",
-      "status": "Finished"
-    },
-    {
-      "pos": 10,
-      "driver": "Pierre Gasly",
-      "team": "Alpine",
-      "status": "Finished"
-    },
-    {
-      "pos": 11,
-      "driver": "Oscar Piastri",
-      "team": "McLaren",
-      "status": "Finished"
-    },
-    {
-      "pos": 12,
       "driver": "Ollie Bearman",
       "team": "Haas",
       "status": "Finished"
     },
     {
+      "pos": 10,
+      "driver": "Carlos Sainz",
+      "team": "Williams",
+      "status": "Finished"
+    },
+    {
+      "pos": 11,
+      "driver": "Nico Hulkenberg",
+      "team": "Audi",
+      "status": "Finished"
+    },
+    {
+      "pos": 12,
+      "driver": "Liam Lawson",
+      "team": "Racing Bulls",
+      "status": "Finished"
+    },
+    {
       "pos": 13,
-      "driver": "Esteban Ocon",
-      "team": "Haas",
+      "driver": "Oscar Piastri",
+      "team": "McLaren",
       "status": "Finished"
     },
     {
@@ -86,50 +86,50 @@
     },
     {
       "pos": 15,
-      "driver": "Andrea Kimi Antonelli",
-      "team": "Mercedes",
+      "driver": "Gabriel Bortoleto",
+      "team": "Audi",
       "status": "Finished"
     },
     {
       "pos": 16,
       "driver": "Valtteri Bottas",
       "team": "Cadillac",
-      "status": "Finished"
-    },
-    {
-      "pos": 17,
-      "driver": "Carlos Sainz",
-      "team": "Williams",
-      "status": "Lapped"
-    },
-    {
-      "pos": 18,
-      "driver": "Fernando Alonso",
-      "team": "Aston Martin",
-      "status": "Lapped"
-    },
-    {
-      "pos": 19,
-      "driver": "Lance Stroll",
-      "team": "Aston Martin",
-      "status": "Lapped"
-    },
-    {
-      "pos": 20,
-      "driver": "Max Verstappen",
-      "team": "Red Bull",
       "status": "Retired"
     },
     {
-      "pos": 21,
+      "pos": 17,
+      "driver": "Franco Colapinto",
+      "team": "Alpine",
+      "status": "Retired"
+    },
+    {
+      "pos": 18,
+      "driver": "Pierre Gasly",
+      "team": "Alpine",
+      "status": "Retired"
+    },
+    {
+      "pos": 19,
+      "driver": "Lando Norris",
+      "team": "McLaren",
+      "status": "Retired"
+    },
+    {
+      "pos": 20,
       "driver": "Alex Albon",
       "team": "Williams",
       "status": "Retired"
     },
     {
+      "pos": 21,
+      "driver": "Fernando Alonso",
+      "team": "Aston Martin",
+      "status": "Retired"
+    },
+    {
       "pos": 22,
-      "driver": "Nico Hulkenberg",
-      "team": "Audi",
+      "driver": "Lance Stroll",
+      "team": "Aston Martin",
       "status": "Retired"
     }
   ]
