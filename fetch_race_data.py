@@ -307,16 +307,29 @@ def apply_penalties(grid, penalties, pitlane):
             sys.exit(f"Penalty names a driver not on the grid: {name}")
 
     order = [d["driver"] for d in sorted(grid, key=lambda x: x["pos"])]
-    targets = {}
-    for name, drop in penalties.items():
-        targets[name] = min(order.index(name) + 1 + drop, len(order))
+    slots = len(order) - len(pitlane)   # places available ahead of the back row
 
-    moved = set(targets) | set(pitlane)
+    # A penalty is applied to the qualifying position, so a drop can target a
+    # slot past the end of the grid. Baku 2026: Perez qualified 20th and took
+    # three places, aiming at 23rd, with both Aston Martins already sent to the
+    # back. Capping at len(order) let that target fall outside the fill loop and
+    # the driver was dropped from the grid entirely, silently, leaving 21 cars.
+    # Anything overshooting now lines up at the back of the non-pitlane runners,
+    # in penalised order, which is what the FIA does.
+    targets, overflow = {}, []
+    for name, drop in sorted(penalties.items(), key=lambda kv: order.index(kv[0])):
+        wanted = order.index(name) + 1 + drop
+        if wanted > slots:
+            overflow.append(name)
+        else:
+            targets[name] = wanted
+
+    moved = set(targets) | set(overflow) | set(pitlane)
     clean = [n for n in order if n not in moved]
     placed = {slot: name for name, slot in targets.items()}
 
     final, slot, i = [], 1, 0
-    while len(final) < len(order) - len(pitlane):
+    while len(final) < slots - len(overflow):
         if slot in placed:
             final.append(placed[slot])
         elif i < len(clean):
@@ -325,7 +338,11 @@ def apply_penalties(grid, penalties, pitlane):
         else:
             break
         slot += 1
+    final.extend(overflow)
     final.extend(pitlane)
+
+    if len(final) != len(order):
+        sys.exit(f"grid rebuild lost drivers: {len(final)} of {len(order)}")
 
     out = []
     for pos, name in enumerate(final, 1):
