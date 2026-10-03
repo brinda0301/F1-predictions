@@ -89,8 +89,15 @@ def race_banner_text(folder, race_info):
     name = race_info.get("name") if race_info else None
     circuit = race_info.get("circuit") if race_info else None
     date = race_info.get("date") if race_info else None
-    if not name and folder in RACE_META:
-        name, circuit = RACE_META[folder]
+    # RACE_META holds hand-written circuit names ("Hungaroring", "Spa-
+    # Francorchamps") that read better than the generic value in data.py, so it
+    # still wins on circuit where an entry exists. It stops at round 14 and is
+    # no longer extended: with the key above corrected, a new race renders from
+    # its own RACE_INFO without any edit here.
+    meta = RACE_META.get(folder)
+    if meta:
+        name = name or meta[0]
+        circuit = meta[1]
     if not name:
         name = pretty_name(folder)
     parts = [name]
@@ -192,7 +199,12 @@ with tab_race:
         if result and result.get("result"):
             actual_winner = result["result"][0]["driver"]
 
-        race_info = pred.get("race_info", {})
+        # engine.py writes this block under "race". Reading "race_info" here
+        # silently returned {} on every race of the season, so the first branch
+        # of race_banner_text never ran. RACE_META hid it: rounds 1-14 have
+        # entries there and rendered correctly, and only R15 onward fell through
+        # to the bare folder name. Fixed R16.
+        race_info = pred.get("race", {})
 
         # Race banner
         st.markdown(f"""
