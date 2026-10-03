@@ -42,6 +42,7 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
 | 13 | Italian GP | George Russell (15.48%) | George Russell | Kimi Antonelli | Miss | Miss |
 | 14 | Spanish GP (Madring) | Lando Norris (25.33%) | Kimi Antonelli | Kimi Antonelli | Miss | Correct |
 | 15 | Azerbaijan GP | George Russell (90.25%) | George Russell | George Russell | Correct | Correct |
+| 16 | Bahrain GP in Malaysia (Sepang) | Max Verstappen (40.97%) | Isack Hadjar | pending | - | - |
  
 **After 15 scored races**: Monte Carlo 8/15 winners correct (53%). XGBoost 5/12 since debut (42%). Average podium drivers hit: 1.80 of 3.
 
@@ -112,6 +113,60 @@ The model used a single temperature (0.11) for every circuit. Monaco should not 
 | Wet | 0.18 | Wide spread, more chaos |
  
 ## Key Race Analyses
+
+### R16 Sepang: The Models Disagree, Which Makes This Race Worth Something
+
+Written before the race, so the claims below are falsifiable rather than
+retrofitted.
+
+Verstappen took Red Bull's first pole of 2026 by 0.298s, after the team ran a
+Ferrari-derived bargeboard at Sepang. Mercedes brought a major upgrade the same
+weekend and had their worst qualifying of the season, P3 and P7 after penalties.
+
+The two models split on the winner for the first time in several races:
+
+| | Monte Carlo | XGBoost |
+| --- | --- | --- |
+| P1 | Max Verstappen 40.97% | Isack Hadjar, predicted position 2.71 |
+| P2 | Lewis Hamilton 19.52% | Lewis Hamilton 3.24 |
+| P3 | George Russell 5.15% | Max Verstappen 3.65 |
+
+Hadjar qualified third and set the third fastest lap of the day at 95.558. A
+five-place penalty for his seventh engine put him eighth. XGBoost trains on
+features against finishing position, and the penalty reaches it only through
+`grid_pos`, so it reads a fast car starting eighth and predicts a recovery drive.
+Monte Carlo weights the grid slot more heavily and ranks him sixth.
+
+That is a clean test. If Hadjar finishes near the front, weighting measured pace
+above grid position was right here. If he spends the race in traffic, the grid
+slot was the better signal. Baku offered no such test, because both models and
+the naive baseline made the same call.
+
+**Confidence tracked the margin, not a label.** Baku produced 90.25% off a 0.837s
+pole gap on a circuit tagged `street`, softmax temperature 0.07. Sepang produces
+40.97% off 0.298s on `balanced` at 0.12. The write-up below argues the Baku number
+was partly an artefact of a hand-typed label. This race is the counter-example
+worth recording: when the gap is genuinely smaller, the distribution genuinely
+flattens.
+
+**A prediction that did not come true.** Before running this, the expectation
+written down was that stale hand-set team priors would suppress Verstappen, the
+way they held Gasly seventh off a shock pole at Monza. They did not.
+`ENERGY_READINESS` still reads Red Bull 0.78 against Mercedes 0.88, and measured
+`quali_pace` at 1.0 with a team pace deficit of 0.0 overcame it without trouble.
+The Monza failure needed a team whose season-long race pace was also weak. Red
+Bull sits fourth in the constructors' championship with five podiums in six
+finishes, so its priors were never that far from the truth. No value was
+hand-edited before this prediction.
+
+**Two audit fixes fired on this one race.** Colapinto's fifteen-place drop targets
+slot 30 and Lindblad's back-of-grid penalty targets slot 46, both past the end of
+a 22-car grid. The R15 overflow fix places them at the back in penalised order,
+and the rebuilt grid matches the official FIA classification on all 22 slots.
+Separately, Gasly and Bortoleto were both slower in Q3 than in Q2. The `best_lap`
+fix records their quicker Q2 times; the original code would have logged them
+0.800s and 0.859s slow and inflated the Alpine and Audi team pace deficits by
+close to a second each.
 
 ### R15 Baku: Right Winner, Wrong Everything Else
 
@@ -458,7 +513,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Practice-pace fallback**: a driver missing from `FP1_TIMES` scores 0.3, a low value, so sitting out a session for a rookie run reads as slowness. The median of drivers who did run would treat absence as no information instead of bad information
 - **Fit softmax temperature instead of typing it**: the four per-track-type values, street 0.07 through wet 0.18, were set by hand and never tested. At Baku the label alone drives the headline confidence more than any feature weight does. Refit them over the 48 backtest races and report the held-out log loss for each candidate
 - **Dead XGBoost features**: at R12 the model assigned `race_pace` and `tyre_management` zero importance, while `tyre_compound_fit` and `energy_score` together carried 51%. With 235 rows at max_depth 3, that concentration needs investigating before more features are added
-R15 Azerbaijan scored. Predictions were committed before lights out on September 26, 2026 and are unedited. Backtest covers 2024 and 2025, 48 races.
+R16 Bahrain GP in Malaysia predictions committed before lights out on October 4, 2026. Every prediction through R15 is scored and unedited. Backtest covers 2024 and 2025, 48 races.
  
 ---
 Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/marianaantaya/).
