@@ -516,6 +516,14 @@ def score_round(config_path, race_dir, rnd, race_name, results):
         entry["xgb_winner_correct"] = xg[0] == actual[0]
         entry["xgb_podium_overlap"] = len(set(xg) & set(actual))
 
+    # Log loss and Brier score: how much probability each model put on the
+    # actual winner, beside the pole baseline. See probscore.py.
+    try:
+        import probscore
+        entry.update(probscore.round_scores(pred, actual[0]))
+    except Exception as exc:  # scoring must never block writing the result
+        print(f"  Probability scoring skipped: {exc}")
+
     history.append(entry)
     history.sort(key=lambda e: e["round"])
     config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
@@ -525,6 +533,10 @@ def score_round(config_path, race_dir, rnd, race_name, results):
     xgb_hits = sum(e["xgb_winner_correct"] for e in xgb_rounds)
     print(f"  Scored R{rnd}: predicted {mc[0]}, won {actual[0]}")
     print(f"  Monte Carlo {hits}/{len(history)}  XGBoost {xgb_hits}/{len(xgb_rounds)}")
+    if "mc_log_loss" in entry:
+        pole = entry.get("pole_log_loss")
+        print(f"  Log loss: Monte Carlo {entry['mc_log_loss']:.3f}"
+              + (f", pole baseline {pole:.3f}" if pole is not None else ""))
 
 
 # ----------------------------------------------------------------------- main

@@ -51,6 +51,47 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
 **These numbers were wrong until R14.** Results for R1-R9 were hand-entered and the midfield was 4-7 places out, up to 16 in places. Winners were right throughout, so the headline accuracy never moved, but two podiums were scored 3/3 that were really 2/3, and several mean position errors were badly understated: Canada was recorded as 0.45 and is 11.0, Britain as 0.36 and is 5.33. Every result is now pulled from the official timing API and verified against it. See Four Silent Data Bugs below.
 
 Four races this season were decided by mechanical failure, not pace: Russell's power unit at Canada, Antonelli's engine at Barcelona, Antonelli's wheel shield at Britain, Russell's retirement at Belgium. No model predicts a part breaking from qualifying data.
+
+## Scoring Probabilities, Not Picks
+
+Winner hit rate cannot separate a good model from the grid. Both pick pole most weekends, and 16 races carries a standard error near 12 points. So from R16 every round is also scored on **log loss** (minus the log of the probability given to the actual winner) and **Brier score**. Both are lower-is-better and both punish a confident miss far harder than a hedged one. `probscore.py` computes them, `score_round` now writes `mc_log_loss`, `xgb_log_loss` and `pole_log_loss` into `config.json`, and R1-R16 are backfilled.
+
+The pole baseline becomes a probability too: P(win | starting slot) from 91 races, 2022-2025. Pole wins 55%, P2 20%, P3 11%. Stored in `grid_prior.json`.
+
+`prob_backtest.py` then tests a deliberately small model against it: a conditional logit (softmax across the field) on four inputs. Log of grid slot, qualifying gap to pole in seconds, and each of those scaled by a circuit overtaking index. The index is the mean grid-to-finish rank correlation at that circuit over earlier races from 2014, so a race never informs its own index.
+
+**Backtest, 91 races, leave-one-race-out:**
+
+| Model | Log loss | Brier | Winners | Avg P(winner) |
+| --- | :---: | :---: | :---: | :---: |
+| Grid prior (pole baseline) | 1.611 | 0.642 | 51/91 | 35.9% |
+| Logit, grid only | 1.474 | 0.638 | 51/91 | 37.9% |
+| Logit, grid + pole gap | 1.332 | 0.630 | 49/91 | 38.6% |
+| Logit, all four inputs | 1.329 | 0.628 | 50/91 | 38.7% |
+
+Half the gain over the table is smoothing: a back-row winner gets a small probability instead of near zero. The other half is the **pole gap**, worth 0.142 log loss with a 90% interval of 0.013 to 0.269. A 0.8s pole and a 0.02s pole do not carry the same odds, and the grid alone cannot tell them apart. The **overtaking index** adds 0.008. Consistent, but small. Winner count does not move at all, which is the point of scoring probabilities: the gain is in how much weight lands on the right driver.
+
+The logit is calibrated. Across 1,818 driver-races, its 50-75% calls won 57% of the time and its 10-25% calls won 23%.
+
+**Live 2026, out of sample.** The logit and the prior were fit on 2022-2025 only, so every 2026 race is new to them:
+
+| Model | Log loss | Brier | Winners | Avg P(winner) |
+| --- | :---: | :---: | :---: | :---: |
+| Monte Carlo (published) | 1.470 | 0.657 | 9/16 | 29.9% |
+| Grid prior | 1.326 | 0.518 | 11/16 | 39.4% |
+| Logit | 0.958 | 0.432 | 11/16 | 49.3% |
+
+The logit beats the grid by 0.368 log loss, 90% interval 0.152 to 0.719. Monte Carlo trails the grid by 0.144, inside noise. XGBoost scores 1.459 over its 13 rounds, level with Monte Carlo. Four inputs and no hand-set constants outperform eighteen features and 100,000 simulations, because the four carry the information and the eighteen mostly restate the grid.
+
+The engine's own softmax, scored on 2024-2025 without the Monte Carlo layer, puts 12.5% on the eventual winner on average against the grid's 37.1%. The simulation sharpens that distribution in live use (Baku went from 33% to 90%), so this understates the published model, but the starting point is too flat.
+
+```
+python prob_backtest.py                 # backtest 2022-2025
+python prob_backtest.py --live          # score 2026 rounds out of sample
+python prob_backtest.py --index         # circuit overtaking index
+python prob_backtest.py --write-prior   # regenerate grid_prior.json
+python probscore.py --backfill          # add log loss to config.json history
+```
  
 ## The 18 Features
  
@@ -568,13 +609,13 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
  
 - **Fix the engine bugs from the audit**: double-counted DNF, the recovery bonus that rewards starting further back, the pole sitter excluded from the random boost, and the reliability feature. These change future predictions only; published predictions are never regenerated
 - **Extend test coverage to the engine**. `test_pipeline.py` covers the data layer. The simulation itself has none, and both R15 engine fixes were bugs a test would have caught
+- **Publish the logit beside Monte Carlo from R17**. It beats the grid out of sample on 2026. Run it on every race, commit it before lights out, and let the season decide whether it replaces the engine
+- **Long-run race pace from FP2 and FP3**: fuel-corrected stint averages via FastF1, added as a fifth logit input and measured against the 91-race backtest. The strongest candidate for information the grid does not hold
 - **Find a feature independent of qualifying pace**. This is now the whole problem. The backtest shows the model reproduces the grid in 94% of races because every feature is either derived from qualifying or fixed per team. Candidates: long-run practice pace, tyre strategy divergence, circuit overtaking rates, pit-lane time loss. Each is testable against 48 races in minutes
 - **Cut the dead features**. Fifteen of eighteen change nothing across 48 races, and three make results marginally worse. Removing them costs no accuracy and makes the remainder interpretable
 - **Settle the recovery term and the reliability feature with the harness**. Both are known-wrong but their replacements are design choices, and the backtest can now measure which version is better rather than leaving it to opinion
 - **Stop training XGBoost on retirements as if they were finishing positions**: the highest-value item on this list, and the only one with a measured cost. 172 of 330 training rows, 52.1%, are drivers who did not finish, labelled at their classified position. That inverts the sign on five of six features at the front of the grid, which is why XGBoost picked a driver whose every feature was worse than the pole sitter's at R16. Three candidate fixes to test over the 48 backtest races: drop non-finishers, which halves the data; train position-given-finish and multiply by a separate reliability model; or treat retirements as right-censored rather than as positions. Whichever wins must also be applied to `score_round`, because mean position error has the same flaw: Russell's R16 retirement entered as a 17-place miss and turned Monte Carlo's best race of the season into its worst
 - **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
-- **Brier score logging**: track probability calibration quality with a single number after each race
-- **XGBoost accuracy history**: log XGBoost results to config so the season chart shows both models
 - **Track-dependent grid weighting**: `grid_win_rate` carries the same 0.0717 weight at Monaco and Monza. At R13 this let a P22 start outrank the pole sitter. Circuits where overtaking is rare should weight starting position far higher, the way softmax temperature already varies by track type
 - **Ensemble layer**: across recent races XGBoost identifies podium drivers while ordering them wrong, and Monte Carlo orders better than it selects. Let XGBoost pick the podium set and Monte Carlo rank it
 - **Refresh hand-set team constants**: `ENERGY_READINESS`, `START_PROCEDURE`, `tyre_management` and `circuit_fit` are set by hand and rarely revisited. At R13 they held Alpine down while measured pace put the car on pole. Priors should decay toward measured performance as the season provides evidence
