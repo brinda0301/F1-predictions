@@ -12,16 +12,17 @@ R15 at Baku is the finding playing out live. The model made its most confident c
 
 ## What It Does
 
-Two models run side by side on every race:
+Three models run side by side on every race:
 
 - **Monte Carlo**: 100,000 simulations across 18 weighted features, with weights adjusted after each race by gradient descent.
 - **XGBoost**: trains on past race features and finishing positions, re-fitted from scratch each race.
+- **Logit** (from R17): four inputs, weights fit once on 91 races from 2022-2025. Grid slot, gap to pole, and both adjusted for how hard the circuit is to pass on. See What Changed in October 2026.
 
 Every prediction is committed before lights out and never regenerated, so the track record cannot be edited after the fact. When a bug is found, the fix applies going forward and the old prediction stands.
 
 `backtest.py` replays 2024 and 2025 through the same feature model with leave-one-race-out scoring, so any change can be tested against 48 races in minutes rather than one data point per fortnight.
 
-The public dashboard shows both predictions, the actual result, a Correct or Miss badge per model, running season accuracy, and the pole baseline beside it.
+The public dashboard shows every model's prediction, the actual result, a Correct or Miss badge per model, running season accuracy, and the pole baseline beside it.
 
 ## Season Track Record
  
@@ -99,6 +100,91 @@ python probscore.py --backfill          # add log loss to config.json history
 python logit_model.py --train           # refit logit_model.json (once per season)
 python logit_model.py 17_<race>         # logit prediction on its own
 ```
+ 
+## What Changed in October 2026
+
+A summary of the R17 update in plain terms. The sections above hold the full numbers.
+
+### The problem
+
+Winner hit rate could not show whether the model added anything. Always picking pole scored 11 of 16 this season. Monte Carlo scored 9. With 16 races, a two-race gap is noise. And hit rate ignores confidence: a 90% call and a 30% call on the same winner score the same.
+
+### Change 1: every round is scored on probability
+
+Two new numbers per round, both lower-is-better:
+
+- **Log loss**: minus the log of the probability a model gave the actual winner. 50% on the winner scores 0.69. 10% scores 2.30. A confident miss costs far more than a hedged one.
+- **Brier score**: the squared error across every driver's probability.
+
+The pole baseline is scored the same way, as P(win | grid slot) from 91 past races. Pole wins 55%, P2 20%, P3 11%. That gives every model one bar on one scale.
+
+### Change 2: a new model, the logit
+
+A logit is logistic regression, one of the simplest models in statistics. This version is a conditional logit: it compares the drivers within one race.
+
+1. Each driver gets a score from four inputs: log of grid slot, qualifying gap to pole in seconds, and each of those scaled by the circuit overtaking index.
+2. A softmax turns the scores into win probabilities summing to 100%.
+3. The four weights come from 91 races, 2022-2025, chosen to put the most probability on the drivers who actually won.
+
+Worked example, R16 Sepang. Sepang sits near the average overtaking index, so the circuit terms are close to zero and two weights do the work: minus 1.02 per unit of log grid slot, minus 2.63 per second off pole.
+
+| Driver | Grid | Gap | Score | Win probability |
+| --- | :---: | :---: | :---: | :---: |
+| Verstappen | P1 | 0.000s | 0.00 | 66% |
+| Hamilton | P2 | 0.298s | -1.49 | 15% |
+
+A score 1.49 lower means about 0.23 times the probability. The gap term is the information the grid lacks: Russell's 0.837s pole at Baku gets 88%, Gasly's 0.06s pole at Monza gets 48%.
+
+### Change 3: the circuit overtaking index
+
+For each circuit, the rank correlation between grid and finish across earlier races from 2014. Near 0.87 means the race finishes close to grid order (Monaco). Near 0.5 means positions change a lot (Las Vegas). A race never informs its own index. In the backtest it adds little, 0.008 log loss, so the pole gap carries the model.
+
+### Results
+
+| | Backtest, 91 races | Live 2026, 16 races |
+| --- | :---: | :---: |
+| Pole baseline | 1.611 | 1.326 |
+| Monte Carlo | not run | 1.470 |
+| Logit | 1.329 | 0.958 |
+
+Log loss, lower is better. The 2026 column is fully out of sample: the logit never saw a 2026 race in training.
+
+### Why four inputs beat eighteen
+
+The backtest showed 15 of the 18 engine features change nothing, because they restate qualifying pace. The logit keeps the two pieces of information that matter, grid slot and pace margin, and learns their weights from results instead of setting them by hand. Four weights from 91 races leaves little room to overfit.
+
+### Files added or changed
+
+| File | What it does |
+| --- | --- |
+| `probscore.py` | Log loss, Brier score, the grid-slot prior, per-round scoring and the R1-R16 backfill |
+| `prob_backtest.py` | 91-race backtest of grid vs logit vs engine, ablation, circuit index, live 2026 scoring |
+| `logit_model.py` | Trains the logit once and predicts live races from `data.py` |
+| `logit_model.json` | Saved weights, circuit index table, 2026 schedule |
+| `grid_prior.json` | P(win \| grid slot) from 2022-2025 |
+| `test_probscore.py` | Ten tests for the metrics, the index and the live model |
+| `engine.py` | Writes the logit into `prediction.json` under `logit` |
+| `fetch_race_data.py` | `score_round` logs log loss for Monte Carlo, XGBoost, logit and pole |
+| `app_public.py` | Third dashboard card, LOGIT WINNER, from R17 |
+| `config.json` | R1-R16 history backfilled with log loss and Brier fields |
+
+### Race weekend workflow
+
+Unchanged. The usual commands now include the logit:
+
+```
+python fetch_race_data.py 17_<race> --round 17          # build the race file
+python engine.py 17_<race>                              # Monte Carlo + XGBoost + logit
+python fetch_race_data.py 17_<race> --round 17 --result --score
+```
+
+Retrain the logit once before 2027 with `python logit_model.py --train`. Not mid-season, so the 2026 record stays out of sample.
+
+### Limits
+
+- The logit was trained on 2022-2025 cars. 2026 brought new regulations, so 16 live races is early evidence.
+- It cannot see race pace, strategy, safety cars or reliability. Long-run practice pace is the next input to test.
+- Winner hit rate does not improve. The gain is in how much probability lands on the right driver.
  
 ## The 18 Features
  
@@ -585,6 +671,8 @@ Ten tests covering the bug classes that reached production this season. Each of 
 
 Each data test was validated by reintroducing the original bug and confirming it fires.
 
+`python test_probscore.py` adds ten more for the probability work: log loss and Brier against hand-computed values, the zero-probability floor, the grid prior, short-name matching for early-season files, the overtaking index never reading the race it scores, and the saved logit model placing R16 at Sepang.
+
 Files written before the API pipeline carry known gaps, such as missing `r1_finish`. Those predictions are published and are not regenerated, so the structural checks apply from `10_belgium` onward. That boundary is a constant at the top of the file.
 
 ## Project Structure
@@ -596,11 +684,17 @@ F1-predictions/
 ├── app_public.py          Public read-only dashboard, deployed to Streamlit Cloud
 ├── fetch_race_data.py     Timing API pipeline: grid, sprint, penalties, results, scoring
 ├── backtest.py            Replays 2024-2025, leave-one-race-out scoring and feature ablation
-├── test_pipeline.py       Nine tests covering the bug classes that reached production
+├── prob_backtest.py       Probability backtest 2022-2025, logit, overtaking index, live scoring
+├── probscore.py           Log loss, Brier score, grid-slot prior, round scoring
+├── logit_model.py         Live logit: train once, predict each race
+├── logit_model.json       Logit weights, circuit index table, 2026 schedule
+├── grid_prior.json        P(win | grid slot), 2022-2025
+├── test_pipeline.py       Ten tests covering the bug classes that reached production
+├── test_probscore.py      Ten tests for the probability scoring and the logit
 ├── config.json            Feature weights, accuracy history, regulation params
 ├── requirements.txt
 └── races/
-    ├── 01_australia/ ... 14_spain/
+    ├── 01_australia/ ... 16_malaysia/
     │   ├── data.py         Race inputs
     │   ├── prediction.json Locked before the race
     │   └── result.json     Actual outcome
