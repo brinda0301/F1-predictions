@@ -353,6 +353,28 @@
       "mean_position_error": 4.0,
       "xgb_winner_correct": true,
       "xgb_podium_overlap": 2
+    },
+    {
+      "round": 16,
+      "race": "Malaysia",
+      "predicted_winner": "Max Verstappen",
+      "predicted_win_pct": 40.97,
+      "actual_winner": "Max Verstappen",
+      "correct": true,
+      "podium_predicted": [
+        "Max Verstappen",
+        "Lewis Hamilton",
+        "George Russell"
+      ],
+      "podium_actual": [
+        "Max Verstappen",
+        "Andrea Kimi Antonelli",
+        "Lewis Hamilton"
+      ],
+      "podium_overlap": 2,
+      "mean_position_error": 6.0,
+      "xgb_winner_correct": false,
+      "xgb_podium_overlap": 2
     }
   ],
   "engine_versions": [

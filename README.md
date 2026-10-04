@@ -42,11 +42,11 @@ The public dashboard shows both predictions, the actual result, a Correct or Mis
 | 13 | Italian GP | George Russell (15.48%) | George Russell | Kimi Antonelli | Miss | Miss |
 | 14 | Spanish GP (Madring) | Lando Norris (25.33%) | Kimi Antonelli | Kimi Antonelli | Miss | Correct |
 | 15 | Azerbaijan GP | George Russell (90.25%) | George Russell | George Russell | Correct | Correct |
-| 16 | Bahrain GP in Malaysia (Sepang) | Max Verstappen (40.97%) | Isack Hadjar | pending | - | - |
+| 16 | Bahrain GP in Malaysia (Sepang) | Max Verstappen (40.97%) | Isack Hadjar | Max Verstappen | Correct | Miss |
  
-**After 15 scored races**: Monte Carlo 8/15 winners correct (53%). XGBoost 5/12 since debut (42%). Average podium drivers hit: 1.80 of 3.
+**After 16 scored races**: Monte Carlo 9/16 winners correct (56%). XGBoost 5/13 since debut (38%). Average podium drivers hit: 1.81 of 3.
 
-**The baseline it has to beat**: always picking the pole sitter gets 10/15 (67%). The model is 13.4 points behind. Russell started on pole at Baku and won, so both the model and the baseline scored that race, and the gap did not move. At 15 races a two-race gap sits inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute.
+**The baseline it has to beat**: always picking the pole sitter gets 11/16 (69%). The model is 12.5 points behind. The pole sitter has now won the last two races, so both the model and the baseline scored both, and the gap has not moved. At 15 races a two-race gap sits inside noise, so neither figure supports a claim yet, but the comparison is the bar and it is published on the dashboard rather than left for a reader to compute.
 
 **These numbers were wrong until R14.** Results for R1-R9 were hand-entered and the midfield was 4-7 places out, up to 16 in places. Winners were right throughout, so the headline accuracy never moved, but two podiums were scored 3/3 that were really 2/3, and several mean position errors were badly understated: Canada was recorded as 0.45 and is 11.0, Britain as 0.36 and is 5.33. Every result is now pulled from the official timing API and verified against it. See Four Silent Data Bugs below.
 
@@ -131,16 +131,83 @@ The two models split on the winner for the first time in several races:
 | P2 | Lewis Hamilton 19.52% | Lewis Hamilton 3.24 |
 | P3 | George Russell 5.15% | Max Verstappen 3.65 |
 
-Hadjar qualified third and set the third fastest lap of the day at 95.558. A
-five-place penalty for his seventh engine put him eighth. XGBoost trains on
-features against finishing position, and the penalty reaches it only through
-`grid_pos`, so it reads a fast car starting eighth and predicts a recovery drive.
-Monte Carlo weights the grid slot more heavily and ranks him sixth.
-
 That is a clean test. If Hadjar finishes near the front, weighting measured pace
 above grid position was right here. If he spends the race in traffic, the grid
 slot was the better signal. Baku offered no such test, because both models and
 the naive baseline made the same call.
+
+**Result: Verstappen won. Hadjar finished fifth from eighth.** Monte Carlo
+correct, XGBoost wrong. The recovery was real but modest, three places, and
+nowhere near a win.
+
+Both models hit two of three podium drivers. XGBoost named Hadjar, Hamilton and
+Verstappen against an actual podium of Verstappen, Antonelli and Hamilton, so it
+identified the right drivers and ordered them badly, which is the pattern already
+recorded below.
+
+**Monte Carlo's mean position error was 6.0, the worst of its season, and the
+figure is an artefact.** The arithmetic is Verstappen 0, Hamilton 1, Russell 17,
+divided by three. Russell was predicted third and is recorded at twentieth, but he
+did not finish twentieth on pace. He retired after 49 laps of a rain-delayed race.
+Across the two predicted drivers who actually finished, the error is 0.5, the best
+of the season.
+
+So the same defect has two symptoms in one race, and both are published. Scoring a
+retirement as a finishing position teaches XGBoost that slow cars finish well, and
+it reports Monte Carlo's best race as its worst. The section below traces it to its
+source.
+
+### Why XGBoost Picked Hadjar, and Why the Obvious Answer Is Wrong
+
+The explanation written here before the race was that XGBoost read a fast car
+starting eighth and predicted a recovery drive. That was wrong, and the model
+itself says so.
+
+Hadjar's feature vector is worse than Verstappen's on every feature that differs
+between them, and identical on the rest. His `quali_pace` is 0.893 against
+Verstappen's 1.0. Nothing in the input makes him look faster.
+
+Swapping Verstappen's features to Hadjar's values one at a time, and measuring
+the change in predicted finishing position:
+
+| Feature | Change | Effect on predicted finish |
+| --- | --- | :---: |
+| `track_history` | 0.5 to 0.0, less history | 0.96 places better |
+| `grid_win_rate` | 0.45 to 0.003, further back | 0.43 places better |
+| `practice_pace` | 1.0 to 0.739, slower | 0.23 places better |
+| `adaptability` | 0.75 to 0.25, less | 0.22 places better |
+| `quali_pace` | 1.0 to 0.893, slower | 0.12 places better |
+| `teammate_gap` | 0.714 to 0.286, worse | 3.84 places worse |
+
+Five of six have inverted sign. The model has learned that a slower driver
+starting further back finishes better. Hadjar was ranked first because he is
+worse, not despite it.
+
+**The cause is the target variable.** `build_training_data` uses the classified
+finishing position as the label, and 172 of 330 training rows, 52.1%, belong to
+drivers who did not finish. A retirement is recorded at its classified position,
+so Verstappen's R12 retirement enters training as finishing position 22 with Red
+Bull's pole-adjacent features attached. Round 1 alone contributes Piastri at 21
+and Hulkenberg at 22, both retirements.
+
+In the region of feature space where `quali_pace` is near 1.0 and `grid_win_rate`
+is 0.45, the training set therefore holds both winners labelled 1 and retirements
+labelled 16 to 22. At `max_depth` 3 on 330 rows the tree shades that bucket toward
+its mixed mean, which lands worse than the bucket just behind it. The global
+relationship is still correct, `quali_pace` against finishing position correlates
+at -0.628, but the local behaviour at the front of the grid is inverted.
+
+The label is answering two questions at once: where did you finish, and did you
+finish. Over half the rows answer the second. Fixing that is on the roadmap and
+goes through the 48-race backtest rather than a hand-tune.
+
+The same substitution corrupts the scoring, not only the training. Mean position
+error treats a classified position as a race outcome, so a retirement from the
+front enters as a 17-place miss. Four races this season were decided by mechanical
+failure, and every one of them inflated the error of whichever model had the
+retiring driver highest. Any fix has to be applied to `score_round` as well as to
+`build_training_data`, or the metric will keep punishing the model for parts
+breaking.
 
 **Confidence tracked the margin, not a label.** Baku produced 90.25% off a 0.837s
 pole gap on a circuit tagged `street`, softmax temperature 0.07. Sepang produces
@@ -504,6 +571,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Find a feature independent of qualifying pace**. This is now the whole problem. The backtest shows the model reproduces the grid in 94% of races because every feature is either derived from qualifying or fixed per team. Candidates: long-run practice pace, tyre strategy divergence, circuit overtaking rates, pit-lane time loss. Each is testable against 48 races in minutes
 - **Cut the dead features**. Fifteen of eighteen change nothing across 48 races, and three make results marginally worse. Removing them costs no accuracy and makes the remainder interpretable
 - **Settle the recovery term and the reliability feature with the harness**. Both are known-wrong but their replacements are design choices, and the backtest can now measure which version is better rather than leaving it to opinion
+- **Stop training XGBoost on retirements as if they were finishing positions**: the highest-value item on this list, and the only one with a measured cost. 172 of 330 training rows, 52.1%, are drivers who did not finish, labelled at their classified position. That inverts the sign on five of six features at the front of the grid, which is why XGBoost picked a driver whose every feature was worse than the pole sitter's at R16. Three candidate fixes to test over the 48 backtest races: drop non-finishers, which halves the data; train position-given-finish and multiply by a separate reliability model; or treat retirements as right-censored rather than as positions. Whichever wins must also be applied to `score_round`, because mean position error has the same flaw: Russell's R16 retirement entered as a 17-place miss and turned Monte Carlo's best race of the season into its worst
 - **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
 - **Brier score logging**: track probability calibration quality with a single number after each race
 - **XGBoost accuracy history**: log XGBoost results to config so the season chart shows both models
@@ -513,7 +581,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Practice-pace fallback**: a driver missing from `FP1_TIMES` scores 0.3, a low value, so sitting out a session for a rookie run reads as slowness. The median of drivers who did run would treat absence as no information instead of bad information
 - **Fit softmax temperature instead of typing it**: the four per-track-type values, street 0.07 through wet 0.18, were set by hand and never tested. At Baku the label alone drives the headline confidence more than any feature weight does. Refit them over the 48 backtest races and report the held-out log loss for each candidate
 - **Dead XGBoost features**: at R12 the model assigned `race_pace` and `tyre_management` zero importance, while `tyre_compound_fit` and `energy_score` together carried 51%. With 235 rows at max_depth 3, that concentration needs investigating before more features are added
-R16 Bahrain GP in Malaysia predictions committed before lights out on October 4, 2026. Every prediction through R15 is scored and unedited. Backtest covers 2024 and 2025, 48 races.
+R16 Bahrain GP in Malaysia scored. Every prediction is committed before lights out and unedited. Backtest covers 2024 and 2025, 48 races.
  
 ---
 Built by [Brinda Bhanderi](https://www.linkedin.com/in/brindabhanderi/). Inspired by [Mariana Antaya](https://www.linkedin.com/in/marianaantaya/).
