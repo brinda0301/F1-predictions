@@ -683,12 +683,23 @@ def predict(race_folder, config=None):
         xgb_winner = xgb_result["predictions"][0]["driver"]
         models_agree = (mc_winner == xgb_winner)
 
+    # --- Conditional logit (added R17) ---
+    # Four inputs: grid slot, gap to pole, both scaled by the circuit's
+    # overtaking index. Fit on 2022-2025. See logit_model.py and the
+    # "Scoring Probabilities, Not Picks" section of the README.
+    try:
+        import logit_model
+        logit_result = logit_model.predict(race_data)
+    except Exception as exc:
+        logit_result = {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
+
     output = {
         "race": race_data["RACE_INFO"],
         "simulations": n_sims,
         "weights_used": weights,
         "predictions": results,
         "xgboost": xgb_result,
+        "logit": logit_result,
         "models_agree": models_agree,
     }
     pred_path = os.path.join(RACES_DIR, race_folder, "prediction.json")
@@ -868,5 +879,14 @@ if __name__ == "__main__":
         print(f"\nXGBoost: {out['xgboost'].get('reason', 'not available')}")
     else:
         print("\nXGBoost not installed. Run: pip install xgboost")
+
+    lg = out.get("logit") or {}
+    if lg.get("available"):
+        lt = lg["predictions"][:3]
+        print(f"\nLogit (grid + pole gap, overtaking index {lg['overtaking_index']})")
+        for i, r in enumerate(lt, 1):
+            print(f"  P{i}: {r['driver']} ({r['win_prob']*100:.1f}%)")
+    else:
+        print(f"\nLogit: {lg.get('reason', 'not available')}")
 
     print(f"\nSimulations: {out['simulations']:,}")

@@ -125,6 +125,11 @@ def round_scores(pred, winner, prior=None):
     if xgb:
         s = score({p["driver"]: p["win_prob"] for p in xgb}, winner)
         out["xgb_log_loss"], out["xgb_brier"] = s["log_loss"], s["brier"]
+    lg = pred.get("logit") or {}
+    if lg.get("available"):
+        s = score({p["driver"]: p["win_prob"] for p in lg["predictions"]}, winner)
+        out["logit_log_loss"], out["logit_brier"] = s["log_loss"], s["brier"]
+        out["logit_winner_correct"] = s["hit"]
     prior = prior or load_prior()
     if prior:
         g = grid_probs({p["driver"]: p["grid_pos"] for p in pred["predictions"]}, prior)

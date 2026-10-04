@@ -92,6 +92,13 @@ python prob_backtest.py --index         # circuit overtaking index
 python prob_backtest.py --write-prior   # regenerate grid_prior.json
 python probscore.py --backfill          # add log loss to config.json history
 ```
+
+**From R17 the logit runs live.** `engine.py` writes it into `prediction.json` under `logit`, beside Monte Carlo and XGBoost, and the dashboard shows it as a third card. It is committed before lights out like the other two, and `score_round` logs `logit_log_loss` and `logit_winner_correct`. Weights and the circuit table live in `logit_model.json`, fit on 2022-2025 and never refit mid-season, so every 2026 call stays out of sample.
+
+```
+python logit_model.py --train           # refit logit_model.json (once per season)
+python logit_model.py 17_<race>         # logit prediction on its own
+```
  
 ## The 18 Features
  
@@ -609,7 +616,6 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
  
 - **Fix the engine bugs from the audit**: double-counted DNF, the recovery bonus that rewards starting further back, the pole sitter excluded from the random boost, and the reliability feature. These change future predictions only; published predictions are never regenerated
 - **Extend test coverage to the engine**. `test_pipeline.py` covers the data layer. The simulation itself has none, and both R15 engine fixes were bugs a test would have caught
-- **Publish the logit beside Monte Carlo from R17**. It beats the grid out of sample on 2026. Run it on every race, commit it before lights out, and let the season decide whether it replaces the engine
 - **Long-run race pace from FP2 and FP3**: fuel-corrected stint averages via FastF1, added as a fifth logit input and measured against the 91-race backtest. The strongest candidate for information the grid does not hold
 - **Find a feature independent of qualifying pace**. This is now the whole problem. The backtest shows the model reproduces the grid in 94% of races because every feature is either derived from qualifying or fixed per team. Candidates: long-run practice pace, tyre strategy divergence, circuit overtaking rates, pit-lane time loss. Each is testable against 48 races in minutes
 - **Cut the dead features**. Fifteen of eighteen change nothing across 48 races, and three make results marginally worse. Removing them costs no accuracy and makes the remainder interpretable

@@ -535,7 +535,9 @@ def score_round(config_path, race_dir, rnd, race_name, results):
     print(f"  Monte Carlo {hits}/{len(history)}  XGBoost {xgb_hits}/{len(xgb_rounds)}")
     if "mc_log_loss" in entry:
         pole = entry.get("pole_log_loss")
+        lg = entry.get("logit_log_loss")
         print(f"  Log loss: Monte Carlo {entry['mc_log_loss']:.3f}"
+              + (f", logit {lg:.3f}" if lg is not None else "")
               + (f", pole baseline {pole:.3f}" if pole is not None else ""))
 
 

@@ -81,6 +81,31 @@ def test_logit_learns_that_pole_wins():
     assert w[0] < -1
 
 
+def test_logit_model_reproduces_backtest_on_r16():
+    """The saved model must place R16 at Sepang and rank by grid and gap."""
+    import logit_model
+    model = logit_model.load_model()
+    assert model is not None, "logit_model.json missing"
+    grid = [{"driver": "A", "team": "T", "pos": 1, "q_time": 95.13},
+            {"driver": "B", "team": "T", "pos": 2, "q_time": 95.428},
+            {"driver": "C", "team": "T", "pos": 3, "q_time": None}]
+    out = logit_model.predict({"GRID": grid, "RACE_INFO": {"round": 16, "date": "2026-10-04"}}, model)
+    assert out["available"] and out["circuit"] == "sepang"
+    p = {r["driver"]: r["win_prob"] for r in out["predictions"]}
+    assert abs(sum(p.values()) - 1) < 1e-3
+    assert p["A"] > p["B"] > p["C"]
+    # A driver with no time takes the capped gap, not zero.
+    assert [r for r in out["predictions"] if r["driver"] == "C"][0]["quali_gap"] == model["gap_cap"]
+
+
+def test_circuit_index_ignores_the_race_itself():
+    import logit_model
+    model = {"circuits": {"x": [["2024-01-01", 0.9], ["2025-01-01", 0.7], ["2026-01-01", 0.0]]},
+             "ot_mean": 0.7}
+    v, n = logit_model.circuit_index(model, "x", "2026-01-01")
+    assert n == 2 and abs(v - 0.8) < 1e-9
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0
