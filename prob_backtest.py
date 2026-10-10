@@ -89,7 +89,8 @@ def season(year, kind):
     The API pages at 100 rows and splits a race across pages, so rows are
     merged by round.
     """
-    field = "Results" if kind == "results" else "QualifyingResults"
+    field = {"results": "Results", "qualifying": "QualifyingResults",
+             "sprint": "SprintResults"}[kind]
     races, offset = {}, 0
     while True:
         data = fetch(f"{year}/{kind}/?limit=100&offset={offset}")
@@ -121,6 +122,10 @@ def load(years):
     for year in years:
         res = season(year, "results")
         qual = season(year, "qualifying") if year >= 2018 else {}
+        try:
+            sprints = season(year, "sprint") if year >= 2021 else {}
+        except Exception:
+            sprints = {}
         for rnd in sorted(res):
             r = res[rnd]
             rows = r["rows"]
@@ -130,6 +135,7 @@ def load(years):
                 g = int(x["grid"])
                 drivers[x["Driver"]["driverId"]] = {
                     "name": f'{x["Driver"]["givenName"]} {x["Driver"]["familyName"]}',
+                    "team": x["Constructor"]["constructorId"],
                     "grid": g if g > 0 else n,          # pit-lane start goes to the back
                     "finish": int(x["position"]),
                     "classified": x["positionText"].isdigit(),
@@ -148,6 +154,12 @@ def load(years):
                     for d, v in drivers.items():
                         t = best.get(d)
                         v["gap"] = min(t - pole, GAP_CAP) if t else GAP_CAP
+            sp = sprints.get(rnd) if sprints else None
+            if sp:
+                for x in sp["rows"]:
+                    d = x["Driver"]["driverId"]
+                    if d in drivers:
+                        drivers[d]["sprint"] = int(x["position"])
             winner = min(drivers, key=lambda d: drivers[d]["finish"])
             out.append({"label": f"{year} R{rnd} {r['name']}", "year": year,
                         "circuit": r["circuit"], "date": r["date"],
