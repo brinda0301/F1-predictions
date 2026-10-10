@@ -1,0 +1,40 @@
+{
+ "features": [
+  "gap",
+  "log_grid",
+  "teammate_gap",
+  "sprint_pos",
+  "ot",
+  "field_gap"
+ ],
+ "monotone": [
+  -1,
+  -1,
+  0,
+  -1,
+  0,
+  1
+ ],
+ "params": {
+  "n_estimators": 250,
+  "max_depth": 2,
+  "learning_rate": 0.05,
+  "min_child_weight": 2,
+  "subsample": 0.9,
+  "colsample_bytree": 1.0,
+  "reg_lambda": 2.0,
+  "objective": "binary:logistic",
+  "random_state": 42,
+  "verbosity": 0
+ },
+ "training_races": 107,
+ "training_rows": 2170,
+ "seasons": [
+  2022,
+  2023,
+  2024,
+  2025,
+  2026
+ ],
+ "last_race": "2026 R16 Bahrain Grand Prix in Malaysia"
+}

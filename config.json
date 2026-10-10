@@ -20,13 +20,14 @@
     "track_history": 0.0244
   },
   "regulation_params": {
-    "softmax_temperature": 0.11,
+    "softmax_temperature": 0.055,
     "track_type_temperatures": {
-      "street": 0.07,
-      "high_speed": 0.1,
-      "balanced": 0.12,
-      "wet": 0.18
-    }
+      "street": 0.035,
+      "high_speed": 0.05,
+      "balanced": 0.06,
+      "wet": 0.09
+    },
+    "temperature_note": "Halved at R17 after mc_backtest.py: log loss 1.387 -> 1.198 on 2026, 1.786 -> 1.445 on 2024-2025"
   },
   "last_calibrated_after_round": 10,
   "accuracy_history": [

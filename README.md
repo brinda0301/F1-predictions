@@ -14,8 +14,8 @@ R15 at Baku is the finding playing out live. The model made its most confident c
 
 Three models run side by side on every race:
 
-- **Monte Carlo**: 100,000 simulations across 18 weighted features, with weights adjusted after each race by gradient descent.
-- **XGBoost**: trains on past race features and finishing positions, re-fitted from scratch each race.
+- **Monte Carlo**: 100,000 simulations across 18 weighted features, with weights adjusted after each race by gradient descent. Recalibrated at R17, see Model Upgrades.
+- **XGBoost**: from R17, a win classifier trained on 2,170 driver rows from 2022-2026, with monotone constraints. Before R17, a position regressor on 2026 data alone.
 - **Logit** (from R17): four inputs, weights fit once on 91 races from 2022-2025. Grid slot, gap to pole, and both adjusted for how hard the circuit is to pass on. See What Changed in October 2026.
 
 Every prediction is committed before lights out and never regenerated, so the track record cannot be edited after the fact. When a bug is found, the fix applies going forward and the old prediction stands.
@@ -101,6 +101,59 @@ python logit_model.py --train           # refit logit_model.json (once per seaso
 python logit_model.py 17_<race>         # logit prediction on its own
 ```
  
+## Model Upgrades at R17: Monte Carlo and XGBoost
+
+Monte Carlo vs XGBoost is the core comparison of this project. At R17 both models were rebuilt around one rule: every change has to lower log loss on races the model has not seen.
+
+### XGBoost v2
+
+At R17, v1 ranked Verstappen tenth from pole after he won the sprint. Per-prediction feature contributions showed why: the sprint win pushed him 0.88 places back, and a `tyre_compound_fit` of 0.945 hurt him while 0.940 helped Leclerc. 300 trees fit to 352 rows had learned noise.
+
+| | v1 (R4-R17) | v2 (from R17) |
+| --- | --- | --- |
+| Training data | 2026 only, 352 rows | 2022-2026, 2,170 rows |
+| Target | Finishing position, softmax at temperature 1.5 | Won the race, yes or no |
+| Features | 18, ten of them hand-set constants | 6, all from timing data |
+| Guardrails | None | Monotone: a smaller gap, better grid slot or better sprint finish never lowers win probability |
+| Trees | 300 at depth 3 | 250 at depth 2 |
+
+The six inputs: qualifying gap to the fastest lap, log grid slot, gap to teammate, sprint finish, circuit overtaking index, and margin to the next-fastest car.
+
+Walk-forward test over the 13 rounds v1 ran (each round trained only on races before it):
+
+| | Log loss | Winners |
+| --- | :---: | :---: |
+| XGBoost v1 (published) | 1.461 | 5/13 |
+| XGBoost v2 | 1.062 | 8/13 |
+
+### Monte Carlo
+
+`mc_backtest.py` runs the simulation itself on win probability, over the 16 completed 2026 rounds and 48 races rebuilt from 2024-2025. Three changes passed:
+
+| Change | 2026 log loss | 2024-2025 log loss |
+| --- | :---: | :---: |
+| Before (published settings) | 1.390 | 1.821 |
+| Recovery bonus removed | 1.387 | 1.786 |
+| + softmax temperature halved | 1.198 | 1.445 |
+| + track history off | 1.083 | n/a |
+
+- **Recovery bonus removed.** It rewarded starting further back (R13 Monza write-up). Small gain, and it removes a known defect.
+- **Temperature halved.** The softmax was too flat: on average Monte Carlo gave the eventual winner 31% on 2026 races. Now 48%. Every track type scaled by the same 0.5, chosen from 1.0, 0.7, 0.5 and 0.35. Both test sets picked 0.5.
+- **Track history off.** It gave Hamilton 35% from P3 at Singapore on four old wins, the Hungary pattern. Tested on 2026 only, since the 2024-2025 rebuild has no history data, so this rests on 16 races.
+- **Pole time bug fixed.** `quali_pace` measured gaps from whoever started first, not the fastest lap. With a penalised pole sitter, other drivers scored above 1.0.
+
+Winner counts barely move. The gain is how much probability lands on the actual winner.
+
+### R17 Singapore was re-run before lights out
+
+The first R17 prediction (commit 3517610) used the old settings: Monte Carlo Verstappen 48.22%, XGBoost Leclerc 36.0%. Both models were upgraded and the prediction re-run on the same grid before the race. The original stays in git history. Both versions are scored after the race.
+
+```
+python xgb_model.py --backtest     # v1 vs v2, walk-forward over 2026
+python xgb_model.py --train        # refit v2 after each race
+python mc_backtest.py              # Monte Carlo settings sweep
+```
+
 ## What Changed in October 2026
 
 A summary of the R17 update in plain terms. The sections above hold the full numbers.
@@ -176,6 +229,7 @@ Unchanged. The usual commands now include the logit:
 python fetch_race_data.py 17_<race> --round 17          # build the race file
 python engine.py 17_<race>                              # Monte Carlo + XGBoost + logit
 python fetch_race_data.py 17_<race> --round 17 --result --score
+python xgb_model.py --train                             # from R17: refit XGBoost v2 with the new result
 ```
 
 Retrain the logit once before 2027 with `python logit_model.py --train`. Not mid-season, so the 2026 record stays out of sample.
@@ -698,9 +752,12 @@ F1-predictions/
 ├── probscore.py           Log loss, Brier score, grid-slot prior, round scoring
 ├── logit_model.py         Live logit: train once, predict each race
 ├── logit_model.json       Logit weights, circuit index table, 2026 schedule
+├── xgb_model.py           XGBoost v2: win classifier, 2022-2026, monotone constraints
+├── xgb_model.json         Saved v2 model, refit after each race
+├── mc_backtest.py         Monte Carlo log loss sweep over 2026 and 2024-2025
 ├── grid_prior.json        P(win | grid slot), 2022-2025
 ├── test_pipeline.py       Ten tests covering the bug classes that reached production
-├── test_probscore.py      Ten tests for the probability scoring and the logit
+├── test_probscore.py      Twelve tests for probability scoring, the logit, XGBoost v2 and the simulation
 ├── config.json            Feature weights, accuracy history, regulation params
 ├── requirements.txt
 └── races/
@@ -724,7 +781,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Find a feature independent of qualifying pace**. This is now the whole problem. The backtest shows the model reproduces the grid in 94% of races because every feature is either derived from qualifying or fixed per team. Candidates: long-run practice pace, tyre strategy divergence, circuit overtaking rates, pit-lane time loss. Each is testable against 48 races in minutes
 - **Cut the dead features**. Fifteen of eighteen change nothing across 48 races, and three make results marginally worse. Removing them costs no accuracy and makes the remainder interpretable
 - **Settle the recovery term and the reliability feature with the harness**. Both are known-wrong but their replacements are design choices, and the backtest can now measure which version is better rather than leaving it to opinion
-- **Fix or retire XGBoost**: 71 of 330 training rows, 21.5%, are retirements labelled at their classified position (first reported as 52.1%, which wrongly counted lapped finishers). Dropping them does not help. Fewer features and shallower trees do: two features and depth 2 cut leave-one-out log loss from 1.951 to 1.384. That is still worse than the logit, so the open question is whether XGBoost earns a place at all. Mean position error in `score_round` still counts a retirement from the front as a 17-place miss and needs the same review
+- **XGBoost v2 shipped at R17** (see Model Upgrades). Remaining note on v1: 71 of 330 training rows, 21.5%, are retirements labelled at their classified position (first reported as 52.1%, which wrongly counted lapped finishers). Dropping them does not help. Fewer features and shallower trees do: two features and depth 2 cut leave-one-out log loss from 1.951 to 1.384. That is still worse than the logit, so the open question is whether XGBoost earns a place at all. Mean position error in `score_round` still counts a retirement from the front as a 17-place miss and needs the same review
 - **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
 - **Track-dependent grid weighting**: `grid_win_rate` carries the same 0.0717 weight at Monaco and Monza. At R13 this let a P22 start outrank the pole sitter. Circuits where overtaking is rare should weight starting position far higher, the way softmax temperature already varies by track type
 - **Ensemble layer**: across recent races XGBoost identifies podium drivers while ordering them wrong, and Monte Carlo orders better than it selects. Let XGBoost pick the podium set and Monte Carlo rank it

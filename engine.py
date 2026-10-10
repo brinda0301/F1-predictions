@@ -44,6 +44,9 @@ CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 # at the start in Melbourne. 45% from pole feels right for now.
 POLE_WIN_RATE = 0.45
 
+# Multiplies the track_history feature. Tested at R17 against 2026 rounds 1-16.
+TRACK_HISTORY_SCALE = 0.0   # off from R17: 2026 log loss 1.198 -> 1.083
+
 # FIA target: cars retain 90% downforce when following 20m behind.
 # Was ~70% by end of 2025. Simpler front wings + flatter floors +
 # no beam wing = way less dirty air. Biggest single change for racing.
@@ -195,7 +198,11 @@ def build_features(driver, race_data):
     team = driver["team"]
     grid = driver["pos"]
     q_time = driver["q_time"]
-    pole_time = race_data["GRID"][0]["q_time"]
+    # Fastest qualifying lap, not the time of whoever starts first. With a
+    # penalised pole sitter GRID[0] is someone slower, which pushed other
+    # drivers' quali_pace above 1.0. Fixed R17.
+    _times = [d["q_time"] for d in race_data["GRID"] if d.get("q_time")]
+    pole_time = min(_times) if _times else None
 
     fp1 = race_data["FP1_TIMES"]
     exp = race_data["DRIVER_EXPERIENCE"].get(name, {"f1_seasons": 0})
@@ -328,6 +335,7 @@ def build_features(driver, race_data):
 
     # 18. TRACK HISTORY
     track = min(1.0, history.get("wins", 0) * 0.3 + history.get("podiums", 0) * 0.1)
+    track *= TRACK_HISTORY_SCALE
 
     return {
         "quali_pace": round(quali_pace, 4),
@@ -488,18 +496,15 @@ def xgboost_predict(race_folder):
 # prediction (Monte Carlo + XGBoost combined)
 # ---------------------------------------------------------------
 
-def predict(race_folder, config=None):
-    """
-    1. build 18 features per driver
-    2. weighted sum + softmax -> probabilities
-    3. 100K Monte Carlo simulations with 2026 race events
-    4. train XGBoost on past races, predict this race
-    5. write both outputs to prediction.json
-    """
-    if config is None:
-        config = load_config()
+def simulate(race_data, config, n_sims=100_000, temp_scale=1.0, recovery="none"):
+    """Softmax over weighted features, then the Monte Carlo race simulation.
 
-    race_data = load_race_data(race_folder)
+    Split out of predict() at R17 so the backtest can run the same code with
+    fewer simulations. temp_scale multiplies the softmax temperature.
+    recovery selects the back-of-grid recovery term: "v1" is the original
+    linear bonus that grows with grid slot, "none" removes it (R17 default,
+    chosen by backtest).
+    """
     weights = config["weights"]
     # Track-dependent softmax temperature
     circuit_type = race_data.get("CIRCUIT", {}).get("type", "balanced")
@@ -525,14 +530,14 @@ def predict(race_folder, config=None):
 
     # softmax
     scores = np.array([p["raw_score"] for p in preds])
-    exp_s = np.exp((scores - scores.max()) / temp)
+    exp_s = np.exp((scores - scores.max()) / (temp * temp_scale))
     probs = exp_s / exp_s.sum()
     for i, p in enumerate(preds):
         p["win_prob"] = float(probs[i])
 
     # --- Monte Carlo ---
     np.random.seed(42)
-    n_sims = 100_000
+    # n_sims comes from the argument
     drivers = [p["driver"] for p in preds]
     teams = [p["team"] for p in preds]
     n = len(drivers)
@@ -613,13 +618,17 @@ def predict(race_folder, config=None):
                 v = np.random.randint(2, min(14, n))
                 perf[v] *= np.random.uniform(0.15, 0.55)
 
-        for i in range(n):
-            gp = preds[i]["grid_pos"]
-            if gp > 5:
-                recovery = (gp - 5) * 0.001 * OVERTAKE_BOOST
-                recovery *= np.random.uniform(0.3, 1.0)
-                recovery *= DIRTY_AIR_RETENTION
-                perf[i] += recovery
+        # Recovery term. v1 gave every driver outside the top five a bonus
+        # that grew with grid slot, so P22 outranked P20 and could outrank pole
+        # (see R13 Monza in the README). Off by default from R17.
+        if recovery == "v1":
+            for i in range(n):
+                gp = preds[i]["grid_pos"]
+                if gp > 5:
+                    rec = (gp - 5) * 0.001 * OVERTAKE_BOOST
+                    rec *= np.random.uniform(0.3, 1.0)
+                    rec *= DIRTY_AIR_RETENTION
+                    perf[i] += rec
 
         # range(1, n) skipped index 0, which is the pole sitter, so the one
         # driver on the cleanest air was the only one who could never receive
@@ -666,6 +675,23 @@ def predict(race_folder, config=None):
             "features": p["features"],
         })
     results.sort(key=lambda x: x["win_pct"], reverse=True)
+    return results
+
+
+def predict(race_folder, config=None):
+    """
+    1. build 18 features per driver
+    2. weighted sum + softmax -> probabilities
+    3. 100K Monte Carlo simulations with 2026 race events
+    4. train XGBoost on past races, predict this race
+    5. write both outputs to prediction.json
+    """
+    if config is None:
+        config = load_config()
+
+    race_data = load_race_data(race_folder)
+    weights = config["weights"]
+    results = simulate(race_data, config)
 
     # DNF is already handled inside the simulation: a retired driver has
     # perf set to -1 and is excluded from `finishers`, so they cannot win that
@@ -673,8 +699,18 @@ def predict(race_folder, config=None):
     # which charged every driver for retirement twice and penalised teams with
     # higher hand-set DNF_RATES far more than intended. Removed R15.
     
-    # --- XGBoost (added R4) ---
-    xgb_result = xgboost_predict(race_folder)
+    # --- XGBoost (added R4, v2 from R17) ---
+    # v2 trains a win classifier on 2022-2026 timing data with monotone
+    # constraints. See xgb_model.py. v1 (xgboost_predict below) is kept for
+    # reference and runs only if the v2 model file is missing.
+    try:
+        import xgb_model
+        xgb_result = xgb_model.predict(race_data)
+        if not xgb_result.get("available"):
+            xgb_result = xgboost_predict(race_folder)
+    except Exception as exc:
+        print(f"XGBoost v2 failed ({type(exc).__name__}: {exc}), falling back to v1")
+        xgb_result = xgboost_predict(race_folder)
 
     # Models agree if both pick the same winner
     models_agree = None
@@ -695,7 +731,7 @@ def predict(race_folder, config=None):
 
     output = {
         "race": race_data["RACE_INFO"],
-        "simulations": n_sims,
+        "simulations": 100_000,
         "weights_used": weights,
         "predictions": results,
         "xgboost": xgb_result,
@@ -870,10 +906,11 @@ if __name__ == "__main__":
 
     if out.get("xgboost") and out["xgboost"].get("available"):
         xgb_top = out["xgboost"]["predictions"][:3]
-        print(f"\nXGBoost (trained on {out['xgboost']['trained_rows']} rows, MAE {out['xgboost']['mae']})")
-        print(f"  P1: {xgb_top[0]['driver']} (pos {xgb_top[0]['predicted_position']}, win {xgb_top[0]['win_prob']*100:.1f}%)")
-        print(f"  P2: {xgb_top[1]['driver']} (pos {xgb_top[1]['predicted_position']})")
-        print(f"  P3: {xgb_top[2]['driver']} (pos {xgb_top[2]['predicted_position']})")
+        xg = out["xgboost"]
+        print(f"\nXGBoost v{xg.get('version', 1)} (trained on {xg['trained_rows']} rows"
+              + (f", MAE {xg['mae']})" if "mae" in xg else f", {xg['n_races_trained_on']} races)"))
+        for i, r in enumerate(xgb_top, 1):
+            print(f"  P{i}: {r['driver']} ({r['win_prob']*100:.1f}%)")
         print(f"\nModels agree on winner: {out['models_agree']}")
     elif out.get("xgboost"):
         print(f"\nXGBoost: {out['xgboost'].get('reason', 'not available')}")

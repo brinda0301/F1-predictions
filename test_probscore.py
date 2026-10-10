@@ -106,6 +106,35 @@ def test_circuit_index_ignores_the_race_itself():
     assert n == 2 and abs(v - 0.8) < 1e-9
 
 
+def test_xgb_v2_is_monotone_in_gap_and_grid():
+    """v2 must never score a faster, further-forward car lower. v1 did at R17."""
+    import xgb_model
+    from xgboost import XGBClassifier
+    if not xgb_model.MODEL_PATH.exists():
+        return
+    m = XGBClassifier()
+    m.load_model(xgb_model.MODEL_PATH)
+    base = [{"name": n, "team": t, "grid": g, "gap": gap, "sprint": None}
+            for n, t, g, gap in [("A", "x", 1, 0.0), ("B", "y", 2, 0.3), ("C", "z", 3, 0.6),
+                                  ("D", "x", 4, 0.7), ("E", "y", 5, 0.9), ("F", "z", 6, 1.0)]]
+    p = xgb_model.race_probs(m, xgb_model.feature_rows(base, 0.75))
+    assert all(p[i] >= p[i + 1] - 1e-9 for i in range(3)), p
+
+
+def test_simulate_recovery_off_never_favours_back_of_grid():
+    """Two identical drivers: the one starting further back must not win more."""
+    import sys
+    sys.argv = ["engine"]
+    import engine
+    grid = [{"driver": f"D{i}", "team": "Same", "pos": i, "q_time": 90.0} for i in range(1, 21)]
+    rd = {"GRID": grid, "FP1_TIMES": {}, "SPRINT_RESULT": [], "DRIVER_EXPERIENCE": {},
+          "TEAM_PACE_DEFICIT": {}, "START_PROCEDURE": {}, "ENERGY_READINESS": {},
+          "CIRCUIT_HISTORY": {}, "RACE_INFO": {}, "CIRCUIT": {}, "TYRE_COMPOUNDS": {},
+          "WEATHER": {}}
+    res = {r["driver"]: r["win_pct"] for r in engine.simulate(rd, engine.load_config(), n_sims=2000)}
+    assert res["D20"] <= res["D10"] + 0.5, (res["D10"], res["D20"])
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

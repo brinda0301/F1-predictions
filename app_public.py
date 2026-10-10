@@ -266,17 +266,22 @@ with tab_race:
             if xgb_top:
                 xgb_color = TEAM_COLORS.get(xgb_top["team"], "#FFD700")
                 xgb_win_pct = round(xgb_top["win_prob"] * 100, 2)
-                mae = xgb.get("mae", "n/a")
                 rows = xgb.get("trained_rows", 0)
+                if xgb.get("version") == 2:
+                    xgb_sub = f"V2 WIN CLASSIFIER | {rows} ROWS, 2022-2026 | MONOTONE"
+                    xgb_line = f"P{xgb_top['grid_pos']} grid | {xgb_top.get('quali_gap', '')}s off pole"
+                else:
+                    xgb_sub = f"{rows} TRAINING ROWS | TRAINING MAE {xgb.get('mae', 'n/a')} | HELD-OUT 3.93"
+                    xgb_line = f"P{xgb_top['grid_pos']} grid | predicted finish P{xgb_top['predicted_position']}"
                 st.markdown(f"""
                 <div style="background:#111128;border:2px solid {xgb_color}88;border-radius:12px;padding:24px;text-align:center;height:340px;">
                     <div style="font-size:10px;letter-spacing:3px;color:#FFD700;font-weight:900;">XGBOOST WINNER</div>
-                    <div style="font-size:9px;color:#666;margin-top:2px;">{rows} TRAINING ROWS | TRAINING MAE {mae} | HELD-OUT 3.93</div>
+                    <div style="font-size:9px;color:#666;margin-top:2px;">{xgb_sub}</div>
                     <div style="font-size:46px;margin-top:8px;">🥇</div>
                     <div style="font-size:22px;font-weight:900;color:white;font-family:monospace;margin-top:6px;">{xgb_top['driver']}</div>
                     <div style="font-size:13px;color:{xgb_color};margin-top:2px;">{xgb_top['team']}</div>
                     <div style="font-size:44px;font-weight:900;color:#FFD700;font-family:monospace;margin-top:10px;line-height:1;">{xgb_win_pct}%</div>
-                    <div style="font-size:11px;color:#888;">P{xgb_top['grid_pos']} grid | predicted finish P{xgb_top['predicted_position']}</div>
+                    <div style="font-size:11px;color:#888;">{xgb_line}</div>
                     {xgb_badge}
                 </div>
                 """, unsafe_allow_html=True)
