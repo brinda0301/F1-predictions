@@ -317,9 +317,11 @@ Five of six have inverted sign. The model has learned that a slower driver
 starting further back finishes better. Hadjar was ranked first because he is
 worse, not despite it.
 
-**The cause is the target variable.** `build_training_data` uses the classified
-finishing position as the label, and 172 of 330 training rows, 52.1%, belong to
-drivers who did not finish. A retirement is recorded at its classified position,
+**A suspected cause was the target variable.** `build_training_data` uses the classified
+finishing position as the label, and 71 of 330 training rows, 21.5%, belong to
+drivers who retired. (This section first said 172 rows, 52.1%. That count included
+101 lapped drivers, who finish the race with a valid position. Corrected R17.)
+A retirement is recorded at its classified position,
 so Verstappen's R12 retirement enters training as finishing position 22 with Red
 Bull's pole-adjacent features attached. Round 1 alone contributes Piastri at 21
 and Hulkenberg at 22, both retirements.
@@ -332,8 +334,16 @@ relationship is still correct, `quali_pace` against finishing position correlate
 at -0.628, but the local behaviour at the front of the grid is inverted.
 
 The label is answering two questions at once: where did you finish, and did you
-finish. Over half the rows answer the second. Fixing that is on the roadmap and
-goes through the 48-race backtest rather than a hand-tune.
+finish. One row in five answers the second.
+
+**Dropping retirements does not fix it.** Tested at R17, leave-one-race-out over
+rounds 4-16: removing the 71 retirement rows moved XGBoost's winner log loss from
+1.951 to 2.010, slightly worse. Cutting to 100 trees at depth 2 gave 1.684. Keeping
+only `quali_pace` and `grid_win_rate` gave 1.384. The inversion is mainly
+overfitting: 300 trees on 352 rows learn noise in features that barely vary at the
+front of the grid. At R17 the sprint win counted against Verstappen by 0.88
+places, and a `tyre_compound_fit` of 0.945 hurt him while 0.940 helped Leclerc.
+His predicted finish from pole was P10.7.
 
 The same substitution corrupts the scoring, not only the training. Mean position
 error treats a classified position as a race outcome, so a retirement from the
@@ -714,7 +724,7 @@ Deployed free on Streamlit Community Cloud. Every push to main rebuilds the live
 - **Find a feature independent of qualifying pace**. This is now the whole problem. The backtest shows the model reproduces the grid in 94% of races because every feature is either derived from qualifying or fixed per team. Candidates: long-run practice pace, tyre strategy divergence, circuit overtaking rates, pit-lane time loss. Each is testable against 48 races in minutes
 - **Cut the dead features**. Fifteen of eighteen change nothing across 48 races, and three make results marginally worse. Removing them costs no accuracy and makes the remainder interpretable
 - **Settle the recovery term and the reliability feature with the harness**. Both are known-wrong but their replacements are design choices, and the backtest can now measure which version is better rather than leaving it to opinion
-- **Stop training XGBoost on retirements as if they were finishing positions**: the highest-value item on this list, and the only one with a measured cost. 172 of 330 training rows, 52.1%, are drivers who did not finish, labelled at their classified position. That inverts the sign on five of six features at the front of the grid, which is why XGBoost picked a driver whose every feature was worse than the pole sitter's at R16. Three candidate fixes to test over the 48 backtest races: drop non-finishers, which halves the data; train position-given-finish and multiply by a separate reliability model; or treat retirements as right-censored rather than as positions. Whichever wins must also be applied to `score_round`, because mean position error has the same flaw: Russell's R16 retirement entered as a 17-place miss and turned Monte Carlo's best race of the season into its worst
+- **Fix or retire XGBoost**: 71 of 330 training rows, 21.5%, are retirements labelled at their classified position (first reported as 52.1%, which wrongly counted lapped finishers). Dropping them does not help. Fewer features and shallower trees do: two features and depth 2 cut leave-one-out log loss from 1.951 to 1.384. That is still worse than the logit, so the open question is whether XGBoost earns a place at all. Mean position error in `score_round` still counts a retirement from the front as a 17-place miss and needs the same review
 - **DNF cause split**: separate driver-caused DNFs from mechanical failures so pace scores are not penalized for parts breaking
 - **Track-dependent grid weighting**: `grid_win_rate` carries the same 0.0717 weight at Monaco and Monza. At R13 this let a P22 start outrank the pole sitter. Circuits where overtaking is rare should weight starting position far higher, the way softmax temperature already varies by track type
 - **Ensemble layer**: across recent races XGBoost identifies podium drivers while ordering them wrong, and Monte Carlo orders better than it selects. Let XGBoost pick the podium set and Monte Carlo rank it
