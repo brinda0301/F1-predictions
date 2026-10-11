@@ -22,13 +22,13 @@ GRID = [
     {'driver': 'Carlos Sainz', 'team': 'Williams', 'pos': 13, 'q_time': 93.526},
     {'driver': 'Gabriel Bortoleto', 'team': 'Audi', 'pos': 14, 'q_time': 93.658},
     {'driver': 'Franco Colapinto', 'team': 'Alpine', 'pos': 15, 'q_time': 93.261},
-    {'driver': 'Fernando Alonso', 'team': 'Aston Martin', 'pos': 16, 'q_time': 94.223},
-    {'driver': 'Alex Albon', 'team': 'Williams', 'pos': 17, 'q_time': 94.289},
-    {'driver': 'Lance Stroll', 'team': 'Aston Martin', 'pos': 18, 'q_time': 94.946},
-    {'driver': 'Sergio Perez', 'team': 'Cadillac', 'pos': 19, 'q_time': 95.123},
-    {'driver': 'Valtteri Bottas', 'team': 'Cadillac', 'pos': 20, 'q_time': 95.984},
+    {'driver': 'Alex Albon', 'team': 'Williams', 'pos': 16, 'q_time': 94.289},
+    {'driver': 'Lance Stroll', 'team': 'Aston Martin', 'pos': 17, 'q_time': 94.946},
+    {'driver': 'Sergio Perez', 'team': 'Cadillac', 'pos': 18, 'q_time': 95.123},
+    {'driver': 'Valtteri Bottas', 'team': 'Cadillac', 'pos': 19, 'q_time': 95.984},
+    {'driver': 'Isack Hadjar', 'team': 'Red Bull', 'pos': 20, 'q_time': None},
     {'driver': 'George Russell', 'team': 'Mercedes', 'pos': 21, 'q_time': 91.747},
-    {'driver': 'Isack Hadjar', 'team': 'Red Bull', 'pos': 22, 'q_time': None},
+    {'driver': 'Fernando Alonso', 'team': 'Aston Martin', 'pos': 22, 'q_time': 94.223},
 ]
 
 FP1_TIMES = {
@@ -97,13 +97,13 @@ DRIVER_EXPERIENCE = {
     'Carlos Sainz': {'f1_seasons': 11, 'r1_finish': 17},
     'Gabriel Bortoleto': {'f1_seasons': 2, 'r1_finish': 18},
     'Franco Colapinto': {'f1_seasons': 2, 'r1_finish': 13},
-    'Fernando Alonso': {'f1_seasons': 23, 'r1_finish': 8},
     'Alex Albon': {'f1_seasons': 6, 'r1_finish': 21},
     'Lance Stroll': {'f1_seasons': 9, 'r1_finish': 12},
     'Sergio Perez': {'f1_seasons': 15, 'r1_finish': 19},
     'Valtteri Bottas': {'f1_seasons': 13, 'r1_finish': 22},
-    'George Russell': {'f1_seasons': 7, 'r1_finish': 20},
     'Isack Hadjar': {'f1_seasons': 2, 'r1_finish': 5},
+    'George Russell': {'f1_seasons': 7, 'r1_finish': 20},
+    'Fernando Alonso': {'f1_seasons': 23, 'r1_finish': 8},
 }
 
 TEAM_PACE_DEFICIT = {
@@ -133,7 +133,7 @@ CIRCUIT = {'type': 'street', 'pit_loss_seconds': 28}
 TYRE_COMPOUNDS = {'hardness': 0.25, 'one_stop_probability': 0.85}
 
 # REPLACE with the race day forecast before predicting.  # carried over from previous data.py
-WEATHER = {'track_temp_c': 32, 'rain_probability': 0.3}  # F1.com: 40% shower risk mid/late afternoon, night race, track cools after sunset
+WEATHER = {'track_temp_c': 32, 'rain_probability': 0.3}
 
 # Past results at this circuit, per driver.  # carried over from previous data.py
-CIRCUIT_HISTORY = {'Lewis Hamilton': {'wins': 4, 'podiums': 7}, 'Fernando Alonso': {'wins': 2, 'podiums': 5}, 'Lando Norris': {'wins': 1, 'podiums': 3}, 'Carlos Sainz': {'wins': 1, 'podiums': 2}, 'Sergio Perez': {'wins': 1, 'podiums': 1}, 'George Russell': {'wins': 1, 'podiums': 1}, 'Max Verstappen': {'wins': 0, 'podiums': 4}, 'Charles Leclerc': {'wins': 0, 'podiums': 2}, 'Valtteri Bottas': {'wins': 0, 'podiums': 1}, 'Oscar Piastri': {'wins': 0, 'podiums': 1}}  # 2008-2025, computed from the timing API
+CIRCUIT_HISTORY = {'Lewis Hamilton': {'wins': 4, 'podiums': 7}, 'Fernando Alonso': {'wins': 2, 'podiums': 5}, 'Lando Norris': {'wins': 1, 'podiums': 3}, 'Carlos Sainz': {'wins': 1, 'podiums': 2}, 'Sergio Perez': {'wins': 1, 'podiums': 1}, 'George Russell': {'wins': 1, 'podiums': 1}, 'Max Verstappen': {'wins': 0, 'podiums': 4}, 'Charles Leclerc': {'wins': 0, 'podiums': 2}, 'Valtteri Bottas': {'wins': 0, 'podiums': 1}, 'Oscar Piastri': {'wins': 0, 'podiums': 1}}
