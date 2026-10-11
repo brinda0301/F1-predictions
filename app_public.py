@@ -194,11 +194,6 @@ with tab_race:
         winner = predictions[0]
         xgb = pred.get("xgboost", {})
         xgb_top = xgb["predictions"][0] if (xgb and xgb.get("available")) else None
-        # Logit added R17. Earlier predictions have no "logit" block and keep
-        # the two-card layout, because published predictions are never rerun.
-        lg = pred.get("logit") or {}
-        lg_top = lg["predictions"][0] if lg.get("available") else None
-
         actual_winner = None
         if result and result.get("result"):
             actual_winner = result["result"][0]["driver"]
@@ -235,18 +230,8 @@ with tab_race:
                 else:
                     xgb_badge = '<div style="font-size:11px;color:#ff5555;font-weight:900;letter-spacing:2px;margin-top:6px;">MISS</div>'
 
-        lg_badge = ""
-        if actual_winner and lg_top:
-            ok = actual_winner == lg_top["driver"]
-            lg_badge = (f'<div style="font-size:11px;color:{"#00ff88" if ok else "#ff5555"};'
-                        f'font-weight:900;letter-spacing:2px;margin-top:6px;">'
-                        f'{"CORRECT" if ok else "MISS"}</div>')
-
-        # Winner cards: Monte Carlo, XGBoost, and the logit from R17 on
-        if lg_top:
-            col_mc, col_xgb, col_lg = st.columns(3)
-        else:
-            col_mc, col_xgb = st.columns(2)
+        # Dual winner cards
+        col_mc, col_xgb = st.columns(2)
         with col_mc:
             mc_color = TEAM_COLORS.get(winner["team"], "#00D2BE")
             st.markdown(f"""
@@ -291,22 +276,6 @@ with tab_race:
                     <div style="font-size:10px;letter-spacing:3px;color:#FFD700;font-weight:900;">XGBOOST</div>
                     <div style="font-size:46px;margin-top:14px;opacity:0.3;">🥇</div>
                     <div style="font-size:14px;color:#888;margin-top:14px;">Not enough training data yet</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-        if lg_top:
-            with col_lg:
-                lg_color = TEAM_COLORS.get(lg_top["team"], "#B388FF")
-                st.markdown(f"""
-                <div style="background:#111128;border:2px solid {lg_color}88;border-radius:12px;padding:24px;text-align:center;height:340px;">
-                    <div style="font-size:10px;letter-spacing:3px;color:#B388FF;font-weight:900;">LOGIT WINNER</div>
-                    <div style="font-size:9px;color:#666;margin-top:2px;">GRID + POLE GAP | OVERTAKING INDEX {lg.get('overtaking_index', '')}</div>
-                    <div style="font-size:46px;margin-top:8px;">🥇</div>
-                    <div style="font-size:22px;font-weight:900;color:white;font-family:monospace;margin-top:6px;">{lg_top['driver']}</div>
-                    <div style="font-size:13px;color:{lg_color};margin-top:2px;">{lg_top['team']}</div>
-                    <div style="font-size:44px;font-weight:900;color:#B388FF;font-family:monospace;margin-top:10px;line-height:1;">{round(lg_top['win_prob'] * 100, 1)}%</div>
-                    <div style="font-size:11px;color:#888;">P{lg_top['grid_pos']} grid | {lg_top['quali_gap']}s off pole</div>
-                    {lg_badge}
                 </div>
                 """, unsafe_allow_html=True)
 

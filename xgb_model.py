@@ -19,7 +19,7 @@ What changed and why, each measured in the backtest before going live:
               log_grid      log of starting slot
               teammate_gap  own gap minus teammate's gap, seconds, clipped +-1.5
               sprint_pos    sprint finish on sprint weekends, missing otherwise
-              ot            circuit overtaking index (see prob_backtest.py)
+              ot            circuit overtaking index (see history_data.py)
               field_gap     gap from this driver to the next-fastest car behind
   Guardrail Monotone constraints: a smaller gap, a better grid slot or a better
             sprint finish can never lower win probability. v1 had no such
@@ -71,7 +71,7 @@ def feature_rows(drivers, ot):
 
 def history_races(through_year=2025, live_year=2026, before_round=None):
     """Feature matrices for 2022-2025 plus live-year rounds before `before_round`."""
-    import prob_backtest as pb
+    import history_data as pb
     hist = pb.load(range(pb.HISTORY_FROM, through_year + 1))
     live = pb.load([live_year])
     allr = hist + live
@@ -112,11 +112,35 @@ def race_probs(model, X):
 
 # Live ------------------------------------------------------------------------
 
-def train():
-    races, _ = history_races()
+def circuit_index(meta, circuit, before, min_editions=2):
+    """Mean grid/finish rank correlation at a circuit over races before `before`.
+
+    Same rule as history_data.overtaking_index, read from the table saved at
+    training time so a live prediction needs no network call.
+    """
+    here = [c for d, c in meta["circuits"].get(circuit, []) if d < before]
+    if len(here) >= min_editions:
+        return float(np.mean(here))
+    allv = [c for rows in meta["circuits"].values() for d, c in rows if d < before]
+    return float(np.mean(allv)) if allv else meta["ot_mean"]
+
+
+def train(live_year=2026):
+    import history_data as pb
+    races, allr = history_races()
     model = fit(races)
     model.save_model(MODEL_PATH)
+    circuits = {}
+    for r in allr:
+        if r["_corr"] is not None:
+            circuits.setdefault(r["circuit"], []).append([r["date"], round(r["_corr"], 4)])
+    schedule = {}
+    for r in pb.fetch(f"{live_year}/")["RaceTable"]["Races"]:
+        schedule[r["round"]] = {"circuit": r["Circuit"]["circuitId"], "date": r["date"]}
     META_PATH.write_text(json.dumps({
+        "circuits": circuits,
+        "schedule": schedule,
+        "ot_mean": round(float(np.mean([c for v in circuits.values() for _, c in v])), 5),
         "features": FEATURES, "monotone": MONOTONE,
         "params": {k: v for k, v in PARAMS.items() if k != "monotone_constraints"},
         "training_races": len(races), "training_rows": int(sum(len(r["y"]) for r in races)),
@@ -130,7 +154,6 @@ def train():
 def predict(race_data):
     """Win probabilities for a race from data.py. Same shape engine.py publishes."""
     from xgboost import XGBClassifier
-    import logit_model
     if not MODEL_PATH.exists():
         return {"available": False, "reason": "xgb_model.json missing, run --train"}
     meta = json.loads(META_PATH.read_text())
@@ -138,12 +161,10 @@ def predict(race_data):
     model.load_model(MODEL_PATH)
 
     info = race_data.get("RACE_INFO", {})
-    lm = logit_model.load_model()
-    ot = lm["ot_mean"]
-    if lm:
-        sched = lm["schedule"].get(str(info.get("round")), {})
-        if sched.get("circuit"):
-            ot, _ = logit_model.circuit_index(lm, sched["circuit"], info.get("date", "9999"))
+    ot = meta["ot_mean"]
+    sched = meta["schedule"].get(str(info.get("round")), {})
+    if sched.get("circuit"):
+        ot = circuit_index(meta, sched["circuit"], info.get("date") or sched.get("date", "9999"))
 
     grid = race_data["GRID"]
     times = [d["q_time"] for d in grid if d.get("q_time")]

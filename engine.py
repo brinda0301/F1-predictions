@@ -22,13 +22,6 @@ import importlib
 import numpy as np
 from collections import defaultdict
 
-# XGBoost is optional. If not installed, the Monte Carlo half still works.
-try:
-    from xgboost import XGBRegressor
-    XGBOOST_AVAILABLE = True
-except ImportError:
-    XGBOOST_AVAILABLE = False
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RACES_DIR = os.path.join(BASE_DIR, "races")
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
@@ -359,143 +352,6 @@ def build_features(driver, race_data):
     }
 
 
-# ===============================================================
-# XGBoost block (added R4 Miami)
-# ===============================================================
-
-def build_training_data(exclude_folder):
-    """Walk past races, return X (features), y (finishing positions), feature_names.
-
-    One row per driver per completed race. Skips the target race so we never
-    train on the data we are about to predict on.
-    """
-    X_rows = []
-    y_rows = []
-    feature_names = None
-
-    for race_folder in get_race_folders():
-        if race_folder == exclude_folder:
-            continue
-        if not has_data(race_folder):
-            continue
-        result_path = os.path.join(RACES_DIR, race_folder, "result.json")
-        if not os.path.exists(result_path):
-            continue
-
-        race_data = load_race_data(race_folder)
-        with open(result_path) as f:
-            result_data = json.load(f)
-
-        actual_pos = {}
-        for r in result_data["result"]:
-            if r.get("pos") is not None:
-                actual_pos[r["driver"]] = r["pos"]
-
-        for driver in race_data["GRID"]:
-            name = driver["driver"]
-            if name not in actual_pos:
-                continue
-            feats = build_features(driver, race_data)
-            if feature_names is None:
-                feature_names = sorted(feats.keys())
-            X_rows.append([feats[k] for k in feature_names])
-            y_rows.append(actual_pos[name])
-
-    if not X_rows:
-        return np.array([]), np.array([]), []
-
-    return np.array(X_rows), np.array(y_rows), feature_names
-
-
-def xgboost_predict(race_folder):
-    """Train XGBoost on past races and predict the target race.
-
-    Returns None if xgboost isn't installed. Returns a dict with
-    available=False if there isn't enough training data yet.
-    """
-    if not XGBOOST_AVAILABLE:
-        return None
-
-    X_train, y_train, feature_names = build_training_data(race_folder)
-
-    if len(X_train) < 10:
-        return {
-            "available": False,
-            "reason": f"Only {len(X_train)} training rows. Need 10+.",
-            "trained_rows": int(len(X_train)),
-        }
-
-    # Roughly 22 drivers per race so this counts the number of races used
-    n_races = max(1, len(X_train) // 20)
-    n_estimators = min(300, 50 + n_races * 20)
-
-    # max_depth stays at 3 until the season has ~7 races logged. Shallow trees
-    # prevent overfitting on small data.
-    model = XGBRegressor(
-        n_estimators=n_estimators,
-        max_depth=3,
-        learning_rate=0.1,
-        objective="reg:squarederror",
-        random_state=42,
-        verbosity=0,
-    )
-    model.fit(X_train, y_train)
-    train_mae = float(np.mean(np.abs(model.predict(X_train) - y_train)))
-
-    # Build target features. Same feature_names order so columns line up.
-    race_data = load_race_data(race_folder)
-    target_drivers = []
-    target_teams = []
-    target_grid = []
-    X_target = []
-    for d in race_data["GRID"]:
-        feats = build_features(d, race_data)
-        target_drivers.append(d["driver"])
-        target_teams.append(d["team"])
-        target_grid.append(d["pos"])
-        X_target.append([feats[k] for k in feature_names])
-
-    X_target = np.array(X_target)
-    predicted_positions = model.predict(X_target)
-
-    # Convert positions to win probabilities. Softmax of -position.
-    # Temp 1.5 keeps the favourite below 70% even when XGBoost is confident.
-    temp = 1.5
-    scores = -predicted_positions / temp
-    scores -= scores.max()
-    exp_s = np.exp(scores)
-    probs = exp_s / exp_s.sum()
-
-    predictions = []
-    for i, drv in enumerate(target_drivers):
-        predictions.append({
-            "driver": drv,
-            "team": target_teams[i],
-            "grid_pos": target_grid[i],
-            "predicted_position": round(float(predicted_positions[i]), 2),
-            "win_prob": round(float(probs[i]), 4),
-        })
-    predictions.sort(key=lambda x: x["predicted_position"])
-
-    importance = {k: round(float(v), 4)
-                  for k, v in zip(feature_names, model.feature_importances_)}
-
-    return {
-        "available": True,
-        "trained_rows": int(len(X_train)),
-        "n_races_trained_on": int(n_races),
-        "n_estimators": n_estimators,
-        "max_depth": 3,
-        "mae": round(train_mae, 3),
-        "predictions": predictions,
-        "feature_importance": importance,
-    }
-
-
-# ---------------------------------------------------------------
-# prediction (Monte Carlo + XGBoost combined)
-# ---------------------------------------------------------------
-
 def simulate(race_data, config, n_sims=100_000, temp_scale=1.0, recovery="none"):
     """Softmax over weighted features, then the Monte Carlo race simulation.
 
@@ -699,18 +555,15 @@ def predict(race_folder, config=None):
     # which charged every driver for retirement twice and penalised teams with
     # higher hand-set DNF_RATES far more than intended. Removed R15.
     
-    # --- XGBoost (added R4, v2 from R17) ---
-    # v2 trains a win classifier on 2022-2026 timing data with monotone
-    # constraints. See xgb_model.py. v1 (xgboost_predict below) is kept for
-    # reference and runs only if the v2 model file is missing.
+    # --- XGBoost v2 (from R17) ---
+    # Win classifier on 2022-2026 timing data with monotone constraints.
+    # See xgb_model.py. v1, a position regressor on 2026 data alone, ran
+    # R4-R16 and was removed at R17. Its code is in git history.
     try:
         import xgb_model
         xgb_result = xgb_model.predict(race_data)
-        if not xgb_result.get("available"):
-            xgb_result = xgboost_predict(race_folder)
-    except Exception as exc:
-        print(f"XGBoost v2 failed ({type(exc).__name__}: {exc}), falling back to v1")
-        xgb_result = xgboost_predict(race_folder)
+    except ImportError:
+        xgb_result = {"available": False, "reason": "xgboost not installed"}
 
     # Models agree if both pick the same winner
     models_agree = None
@@ -719,23 +572,12 @@ def predict(race_folder, config=None):
         xgb_winner = xgb_result["predictions"][0]["driver"]
         models_agree = (mc_winner == xgb_winner)
 
-    # --- Conditional logit (added R17) ---
-    # Four inputs: grid slot, gap to pole, both scaled by the circuit's
-    # overtaking index. Fit on 2022-2025. See logit_model.py and the
-    # "Scoring Probabilities, Not Picks" section of the README.
-    try:
-        import logit_model
-        logit_result = logit_model.predict(race_data)
-    except Exception as exc:
-        logit_result = {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
-
     output = {
         "race": race_data["RACE_INFO"],
         "simulations": 100_000,
         "weights_used": weights,
         "predictions": results,
         "xgboost": xgb_result,
-        "logit": logit_result,
         "models_agree": models_agree,
     }
     pred_path = os.path.join(RACES_DIR, race_folder, "prediction.json")
@@ -916,14 +758,5 @@ if __name__ == "__main__":
         print(f"\nXGBoost: {out['xgboost'].get('reason', 'not available')}")
     else:
         print("\nXGBoost not installed. Run: pip install xgboost")
-
-    lg = out.get("logit") or {}
-    if lg.get("available"):
-        lt = lg["predictions"][:3]
-        print(f"\nLogit (grid + pole gap, overtaking index {lg['overtaking_index']})")
-        for i, r in enumerate(lt, 1):
-            print(f"  P{i}: {r['driver']} ({r['win_prob']*100:.1f}%)")
-    else:
-        print(f"\nLogit: {lg.get('reason', 'not available')}")
 
     print(f"\nSimulations: {out['simulations']:,}")

@@ -1,7 +1,7 @@
 """
 test_probscore.py
 
-Pins the probability metrics and the overtaking index to known values, so a
+Pins the probability metrics, the overtaking index, XGBoost v2 and the simulation to known values, so a
 refactor that changes a score shows up as a failure rather than a quiet shift
 in the published numbers.
 
@@ -16,7 +16,7 @@ import math
 import numpy as np
 
 import probscore
-import prob_backtest as pb
+import history_data as pb
 
 
 def test_log_loss_known_values():
@@ -70,42 +70,6 @@ def test_overtaking_index_uses_only_earlier_races():
     assert n == 2 and abs(v - 0.85) < 1e-9
 
 
-def test_logit_learns_that_pole_wins():
-    """Synthetic field where the front of the grid always wins."""
-    rng = np.random.default_rng(1)
-    races = []
-    for _ in range(40):
-        X = np.column_stack([np.log(np.arange(1, 11)), rng.uniform(0, 1, 10)])
-        races.append((X, 0))
-    w = pb.fit_logit(races)
-    assert w[0] < -1
-
-
-def test_logit_model_reproduces_backtest_on_r16():
-    """The saved model must place R16 at Sepang and rank by grid and gap."""
-    import logit_model
-    model = logit_model.load_model()
-    assert model is not None, "logit_model.json missing"
-    grid = [{"driver": "A", "team": "T", "pos": 1, "q_time": 95.13},
-            {"driver": "B", "team": "T", "pos": 2, "q_time": 95.428},
-            {"driver": "C", "team": "T", "pos": 3, "q_time": None}]
-    out = logit_model.predict({"GRID": grid, "RACE_INFO": {"round": 16, "date": "2026-10-04"}}, model)
-    assert out["available"] and out["circuit"] == "sepang"
-    p = {r["driver"]: r["win_prob"] for r in out["predictions"]}
-    assert abs(sum(p.values()) - 1) < 1e-3
-    assert p["A"] > p["B"] > p["C"]
-    # A driver with no time takes the capped gap, not zero.
-    assert [r for r in out["predictions"] if r["driver"] == "C"][0]["quali_gap"] == model["gap_cap"]
-
-
-def test_circuit_index_ignores_the_race_itself():
-    import logit_model
-    model = {"circuits": {"x": [["2024-01-01", 0.9], ["2025-01-01", 0.7], ["2026-01-01", 0.0]]},
-             "ot_mean": 0.7}
-    v, n = logit_model.circuit_index(model, "x", "2026-01-01")
-    assert n == 2 and abs(v - 0.8) < 1e-9
-
-
 def test_xgb_v2_is_monotone_in_gap_and_grid():
     """v2 must never score a faster, further-forward car lower. v1 did at R17."""
     import xgb_model
@@ -133,6 +97,28 @@ def test_simulate_recovery_off_never_favours_back_of_grid():
           "WEATHER": {}}
     res = {r["driver"]: r["win_pct"] for r in engine.simulate(rd, engine.load_config(), n_sims=2000)}
     assert res["D20"] <= res["D10"] + 0.5, (res["D10"], res["D20"])
+
+
+def test_circuit_index_ignores_the_race_itself():
+    import xgb_model
+    meta = {"circuits": {"x": [["2024-01-01", 0.9], ["2025-01-01", 0.7], ["2026-01-01", 0.0]]},
+            "ot_mean": 0.7}
+    assert abs(xgb_model.circuit_index(meta, "x", "2026-01-01") - 0.8) < 1e-9
+
+
+def test_xgb_v2_places_r17_at_marina_bay():
+    """The saved model must find the circuit from the round number, offline."""
+    import xgb_model
+    if not xgb_model.MODEL_PATH.exists():
+        return
+    grid = [{"driver": "A", "team": "T", "pos": 1, "q_time": 91.373},
+            {"driver": "B", "team": "U", "pos": 2, "q_time": 91.427},
+            {"driver": "C", "team": "T", "pos": 3, "q_time": None}]
+    out = xgb_model.predict({"GRID": grid, "RACE_INFO": {"round": 17, "date": "2026-10-11"}})
+    assert out["available"]
+    assert 0.7 < out["overtaking_index"] < 0.85
+    p = {r["driver"]: r["win_prob"] for r in out["predictions"]}
+    assert abs(sum(p.values()) - 1) < 1e-3 and p["A"] > p["C"]
 
 
 if __name__ == "__main__":

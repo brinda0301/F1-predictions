@@ -13,7 +13,7 @@ one, and a confident hit earns more. Both are lower-is-better.
 Reference points for a 22-car field:
     uniform guess (1/22 each)   log loss 3.09, Brier 0.955
     50% on the winner           log loss 0.69
-    pole baseline, 2022-2025    see prob_backtest.py output
+    pole baseline, 2022-2025    grid_prior.json, from history_data.py --write-prior
 
 Also holds the grid-slot prior: P(win | starting slot) estimated from past
 races. That is the "always pick pole" baseline written as a probability, so it
@@ -89,7 +89,7 @@ PRIOR_PATH = "grid_prior.json"
 
 
 def load_prior(path=PRIOR_PATH):
-    """The 2022-2025 prior written by `prob_backtest.py --write-prior`.
+    """The 2022-2025 prior written by `history_data.py --write-prior`.
 
     Used to score the pole baseline on live 2026 rounds without a network call.
     Returns None if the file has not been generated.
@@ -125,11 +125,6 @@ def round_scores(pred, winner, prior=None):
     if xgb:
         s = score({p["driver"]: p["win_prob"] for p in xgb}, winner)
         out["xgb_log_loss"], out["xgb_brier"] = s["log_loss"], s["brier"]
-    lg = pred.get("logit") or {}
-    if lg.get("available"):
-        s = score({p["driver"]: p["win_prob"] for p in lg["predictions"]}, winner)
-        out["logit_log_loss"], out["logit_brier"] = s["log_loss"], s["brier"]
-        out["logit_winner_correct"] = s["hit"]
     prior = prior or load_prior()
     if prior:
         g = grid_probs({p["driver"]: p["grid_pos"] for p in pred["predictions"]}, prior)

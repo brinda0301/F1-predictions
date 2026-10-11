@@ -9,7 +9,7 @@ Two test sets:
             real hand-set inputs (circuit, weather, history). Uses the current
             config weights, which were calibrated through R16, so this set
             flatters the engine slightly.
-  2024-25   47 races rebuilt by backtest.py from the timing API. Hand-set blocks
+  2024-25   48 races rebuilt from the timing API (race_data below). Hand-set blocks
             sit at defaults, so this isolates the timing features.
 
 Each setting runs with fewer simulations than live (default 3,000) to keep a
@@ -30,12 +30,144 @@ import engine
 import probscore
 sys.argv = _argv
 
+
+# Race rebuilder for 2024-2025, moved from the old backtest.py at R17 ----------
+# Rebuilds each race in the engine's data.py shape from the timing API.
+# Hand-set blocks (circuit, tyres, weather, history) sit at defaults.
+
+import history_data
+
+TEAMS = {
+    "mclaren": "McLaren", "mercedes": "Mercedes", "ferrari": "Ferrari",
+    "red_bull": "Red Bull", "rb": "Racing Bulls", "sauber": "Audi",
+    "audi": "Audi", "alpine": "Alpine", "haas": "Haas",
+    "williams": "Williams", "aston_martin": "Aston Martin",
+    "cadillac": "Cadillac",
+}
+
+
+def get(path):
+    return history_data.fetch(path + "?limit=100")
+
+
+def secs(clock):
+    if not clock:
+        return None
+    parts = clock.strip().split(":")
+    try:
+        if len(parts) == 2:
+            return round(int(parts[0]) * 60 + float(parts[1]), 3)
+        return round(float(parts[0]), 3)
+    except ValueError:
+        return None
+
+
+def name_of(d):
+    return f"{d['givenName']} {d['familyName']}"
+
+
+def qualifying(year, rnd):
+    races = get(f"{year}/{rnd}/qualifying/")["RaceTable"]["Races"]
+    if not races:
+        return []
+    out = []
+    for q in races[0]["QualifyingResults"]:
+        laps = [secs(q.get(k)) for k in ("Q1", "Q2", "Q3")]
+        laps = [l for l in laps if l is not None]
+        out.append({
+            "driver": name_of(q["Driver"]),
+            "team": TEAMS.get(q["Constructor"]["constructorId"], q["Constructor"]["name"]),
+            "pos": int(q["position"]),
+            "q_time": min(laps) if laps else None,
+        })
+    out.sort(key=lambda x: x["pos"])
+    return out
+
+
+def results(year, rnd):
+    races = get(f"{year}/{rnd}/results/")["RaceTable"]["Races"]
+    if not races:
+        return []
+    return [{"pos": int(x["position"]), "driver": name_of(x["Driver"])}
+            for x in races[0]["Results"]]
+
+
+def sprint(year, rnd):
+    races = get(f"{year}/{rnd}/sprint/")["RaceTable"]["Races"]
+    if not races:
+        return []
+    return [{"pos": int(x["position"]), "driver": name_of(x["Driver"]),
+             "team": TEAMS.get(x["Constructor"]["constructorId"], x["Constructor"]["name"])}
+            for x in races[0]["SprintResults"]]
+
+
+def seasons_before(driver, year, debut_cache={}):
+    """Rough experience count: seasons the driver appears in before this one."""
+    if not debut_cache:
+        for y in range(2018, 2027):
+            try:
+                tbl = get(f"{y}/drivers/")["DriverTable"]["Drivers"]
+            except Exception:
+                continue
+            for d in tbl:
+                n = name_of(d)
+                debut_cache.setdefault(n, y)
+    return max(0, year - debut_cache.get(driver, year))
+
+
+def pace_deficit(grid):
+    best = {}
+    for d in grid:
+        if d["q_time"] is None:
+            continue
+        best[d["team"]] = min(best.get(d["team"], 9e9), d["q_time"])
+    if not best:
+        return {}
+    fastest = min(best.values())
+    return {t: round(v - fastest, 3) for t, v in best.items()}
+
+
+def race_data(year, rnd, engine):
+    grid = qualifying(year, rnd)
+    if len(grid) < 10:
+        return None
+    res = results(year, rnd)
+    if not res:
+        return None
+    prev = {r["driver"]: r["pos"] for r in results(year, rnd - 1)} if rnd > 1 else {}
+    fallback = (len(grid) + 1) // 2
+    exp = {
+        d["driver"]: {
+            "f1_seasons": seasons_before(d["driver"], year),
+            "r1_finish": prev.get(d["driver"], fallback),
+        }
+        for d in grid
+    }
+    return {
+        "RACE_INFO": {"round": rnd, "name": f"{year} R{rnd}"},
+        "GRID": grid,
+        "FP1_TIMES": {},
+        "SPRINT_RESULT": sprint(year, rnd),
+        "DRIVER_EXPERIENCE": exp,
+        "TEAM_PACE_DEFICIT": pace_deficit(grid),
+        "START_PROCEDURE": engine.START_PROCEDURE_DEFAULT if hasattr(engine, "START_PROCEDURE_DEFAULT") else {},
+        "ENERGY_READINESS": {},
+        "CIRCUIT": {"type": "balanced", "pit_loss_seconds": 21},
+        "TYRE_COMPOUNDS": {"hardness": 0.5, "one_stop_probability": 0.65},
+        "WEATHER": {"track_temp_c": 30, "rain_probability": 0.10},
+        "CIRCUIT_HISTORY": {},
+        "_RESULT": {r["driver"]: r["pos"] for r in res},
+    }
+
+
+
+# Relative to the live settings in config.json and engine.py. At R17 the
+# current settings scored best across all 64 races combined (log loss 1.355).
 SETTINGS = [
-    ("v1: recovery on, temp x1.0", dict(recovery="v1", temp_scale=1.0)),
-    ("recovery off, temp x1.0", dict(recovery="none", temp_scale=1.0)),
-    ("recovery off, temp x0.7", dict(recovery="none", temp_scale=0.7)),
-    ("recovery off, temp x0.5", dict(recovery="none", temp_scale=0.5)),
-    ("recovery off, temp x0.35", dict(recovery="none", temp_scale=0.35)),
+    ("current settings", dict(recovery="none", temp_scale=1.0)),
+    ("recovery bonus back on", dict(recovery="v1", temp_scale=1.0)),
+    ("temperature x1.4", dict(recovery="none", temp_scale=1.4)),
+    ("temperature x0.7", dict(recovery="none", temp_scale=0.7)),
 ]
 
 
@@ -51,13 +183,12 @@ def races_2026():
 
 
 def races_hist(years=(2024, 2025)):
-    import backtest
     out = []
     for y in years:
-        n = len(backtest.get(f"{y}/")["RaceTable"]["Races"])
+        n = len(get(f"{y}/")["RaceTable"]["Races"])
         for rnd in range(1, n + 1):
             try:
-                rd = backtest.race_data(y, rnd, engine)
+                rd = race_data(y, rnd, engine)
             except Exception:
                 continue
             if rd:
