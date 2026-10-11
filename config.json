@@ -466,6 +466,34 @@
       "xgb_brier": 0.8708,
       "pole_log_loss": 0.6843,
       "pole_brier": 0.2966
+    },
+    {
+      "round": 17,
+      "race": "Singapore",
+      "predicted_winner": "Max Verstappen",
+      "predicted_win_pct": 77.01,
+      "actual_winner": "Max Verstappen",
+      "correct": true,
+      "podium_predicted": [
+        "Max Verstappen",
+        "Lewis Hamilton",
+        "Charles Leclerc"
+      ],
+      "podium_actual": [
+        "Max Verstappen",
+        "Charles Leclerc",
+        "Andrea Kimi Antonelli"
+      ],
+      "podium_overlap": 2,
+      "mean_position_error": 1.67,
+      "xgb_winner_correct": true,
+      "xgb_podium_overlap": 2,
+      "mc_log_loss": 0.2612,
+      "mc_brier": 0.0782,
+      "xgb_log_loss": 0.6259,
+      "xgb_brier": 0.2888,
+      "pole_log_loss": 0.6843,
+      "pole_brier": 0.2966
     }
   ],
   "engine_versions": [

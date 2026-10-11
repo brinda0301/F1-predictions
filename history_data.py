@@ -37,10 +37,17 @@ _last = [0.0]
 
 
 def fetch(path, attempts=6):
-    """One cached, throttled request to the timing API."""
+    """One cached, throttled request to the timing API.
+
+    Past seasons never change, so they are read from the cache. The current
+    season gains a race every weekend, so its requests always go to the API.
+    A cached copy of this season made XGBoost retrain without the latest race
+    at R17.
+    """
     CACHE.mkdir(exist_ok=True)
     key = CACHE / ("pb_" + path.replace("/", "_").replace("?", "_").replace("&", "_") + ".json")
-    if key.exists():
+    live = path.startswith(str(time.gmtime().tm_year))
+    if key.exists() and not live:
         return json.loads(key.read_text())
     sep = "&" if "?" in path else "?"
     url = f"{API}/{path}{sep}format=json"

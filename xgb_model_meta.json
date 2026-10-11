@@ -650,6 +650,10 @@
    [
     "2025-10-05",
     0.8241
+   ],
+   [
+    "2026-10-11",
+    0.7807
    ]
   ],
   "suzuka": [
@@ -1233,7 +1237,7 @@
    "date": "2026-12-06"
   }
  },
- "ot_mean": 0.75326,
+ "ot_mean": 0.75336,
  "features": [
   "gap",
   "log_grid",
@@ -1262,8 +1266,8 @@
   "random_state": 42,
   "verbosity": 0
  },
- "training_races": 107,
- "training_rows": 2170,
+ "training_races": 108,
+ "training_rows": 2192,
  "seasons": [
   2022,
   2023,
@@ -1271,5 +1275,5 @@
   2025,
   2026
  ],
- "last_race": "2026 R16 Bahrain Grand Prix in Malaysia"
+ "last_race": "2026 R17 Singapore Grand Prix"
 }

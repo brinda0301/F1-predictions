@@ -39,11 +39,13 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | 15 | Azerbaijan GP | George Russell (90.25%) | George Russell | George Russell | Correct | Correct |
 | 16 | Bahrain GP in Malaysia (Sepang) | Max Verstappen (40.97%) | Isack Hadjar | Max Verstappen | Correct | Miss |
  
-| 17 | Singapore GP | Max Verstappen (77.0%) | Max Verstappen (53.5%) | pending | | |
+| 17 | Singapore GP | Max Verstappen (77.0%) | Max Verstappen (53.5%) | Max Verstappen | Correct | Correct |
 
-**After 16 races**: Monte Carlo 9/16 winners (56%). XGBoost v1 5/13 (38%). Always picking pole: 11/16 (69%).
+**After 17 races**: Monte Carlo 10/17 winners (59%). XGBoost 6/14 (43%). Always picking pole: 12/17 (71%).
 
 **Log loss, R1-R16 as published** (lower is better): Monte Carlo 1.490, XGBoost v1 1.461 over 13 rounds, pole baseline 1.086. The pole baseline beat both published models. That gap is what the R17 upgrades target.
+
+**R17 Singapore, first race with the rebuilt models**: Verstappen won from pole. Log loss: Monte Carlo 0.261 (77.0% on the winner), XGBoost 0.626 (53.5%), pole baseline 0.684. Both models beat the baseline. XGBoost had Leclerc second, and he finished second. Monte Carlo had Hamilton second on experience, and he finished sixth. One race is one data point. The rebuilt-model scorecard on the dashboard grows from here.
 
 Results R1-R9 were first entered by hand and re-pulled from the timing API at R14. Four races were decided by mechanical failure: Canada, Barcelona, Britain, Belgium.
 
@@ -75,7 +77,7 @@ Walk-forward over the 13 rounds v1 ran, each round trained only on races before 
 | --- | :---: | :---: |
 | XGBoost v1 (published) | 1.461 | 5/13 |
 | Pole baseline, same rounds | 1.179 | |
-| XGBoost v2 | 1.062 | 8/13 |
+| XGBoost v2 | 1.062 (1.046 with the pinned xgboost 3.2.0) | 8/13 |
 
 ### Monte Carlo
 
