@@ -149,8 +149,9 @@ F1-predictions/
 ├── grid_prior.json        P(win | grid slot), 2022-2025
 ├── history_data.py        Race history loader and circuit overtaking index
 ├── mc_backtest.py         Monte Carlo log loss sweep
-├── app_public.py          Public dashboard, deployed to Streamlit Cloud
-├── app.py                 Local dashboard
+├── dashboard.py           The dashboard: race picks, podiums, charts, season log loss, model weights
+├── app_public.py          Public entry point, read-only, deployed to Streamlit Cloud
+├── app.py                 Local entry point, same view plus a Run Prediction panel
 ├── config.json            Monte Carlo weights, temperatures, accuracy history
 ├── test_pipeline.py       Data pipeline tests
 ├── test_probscore.py      Scoring and model tests
