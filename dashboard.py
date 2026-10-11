@@ -19,6 +19,8 @@ import os
 import plotly.graph_objects as go
 import streamlit as st
 
+import probscore
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RACES_DIR = os.path.join(BASE_DIR, "races")
 
@@ -390,6 +392,8 @@ def season_tab(config, folders):
                    "Lower is better. 50% on the winner scores 0.69, 10% scores 2.30. "
                    "Monte Carlo and XGBoost were both rebuilt at R17.")
 
+    scorecard_section(folders)
+
     # Running accuracy, both models and the pole baseline
     rounds, mc_run, xgb_run, pole_run = [], [], [], []
     mh = xh = xn = ph = pn = 0
@@ -436,6 +440,89 @@ def season_tab(config, folders):
             "MC podium hits": f"{h.get('podium_overlap', '')}/3",
         })
     st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+METRIC_ROWS = [
+    ("winner_accuracy", "Winner accuracy", "pct", "Top pick won the race. Higher is better."),
+    ("top3_hit", "Winner in top 3", "pct", "Actual winner was among the model's three most likely. Higher is better."),
+    ("avg_p_winner", "Avg probability on winner", "pct", "How much probability the model put on the driver who won. Higher is better."),
+    ("log_loss", "Log loss", "num", "Minus the log of the probability on the winner. Lower is better."),
+    ("brier", "Brier score", "num", "Squared error across every driver's probability. Lower is better."),
+    ("roc_auc", "ROC AUC", "num", "Chance a winner is ranked above a random non-winner. 0.5 is a coin flip, 1.0 is perfect."),
+    ("avg_winner_rank", "Avg rank of winner", "num1", "Where the actual winner sat in the model's order. Lower is better."),
+]
+MODEL_NAMES = {"mc": "Monte Carlo", "xgb": "XGBoost", "pole": "Always pole"}
+MODEL_COLORS = {"mc": MC_COLOR, "xgb": XGB_COLOR, "pole": "#888888"}
+REBUILD_ROUND = 17
+
+
+def scored_races(folders, first=1, last=99):
+    races = []
+    for f in folders:
+        if not f[:2].isdigit() or not first <= int(f[:2]) <= last:
+            continue
+        pred, res = load_prediction(f), load_result(f)
+        if pred and res and res.get("result"):
+            races.append((pred, res["result"][0]["driver"]))
+    return races
+
+
+def scorecard_table(card):
+    def show(v, kind):
+        if v is None:
+            return "n/a"
+        return f"{100 * v:.0f}%" if kind == "pct" else f"{v:.1f}" if kind == "num1" else f"{v:.3f}"
+    rows = []
+    for key, label, kind, help_ in METRIC_ROWS:
+        row = {"Metric": label}
+        for m in ("mc", "xgb", "pole"):
+            row[MODEL_NAMES[m]] = show(card[m][key], kind) if m in card else "n/a"
+        row["What it means"] = help_
+        rows.append(row)
+    rows.append({"Metric": "Rounds scored",
+                 **{MODEL_NAMES[m]: str(card[m]["rounds"]) if m in card else "0" for m in ("mc", "xgb", "pole")},
+                 "What it means": "XGBoost started at R4."})
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
+def scorecard_section(folders):
+    st.markdown("### Model scorecard")
+    new = scored_races(folders, first=REBUILD_ROUND)
+    old = scored_races(folders, last=REBUILD_ROUND - 1)
+    if new:
+        st.markdown(f"**Rebuilt models, R{REBUILD_ROUND} onward**")
+        scorecard_table(probscore.scorecard(new))
+    else:
+        st.caption(f"Both models were rebuilt before R{REBUILD_ROUND}. Their scorecard appears here "
+                   f"once R{REBUILD_ROUND} has a result.")
+    if old:
+        st.markdown(f"**As published, R1 to R{REBUILD_ROUND - 1}** (Monte Carlo before recalibration, XGBoost v1)")
+        card = probscore.scorecard(old)
+        scorecard_table(card)
+        st.caption("ROC AUC runs high for every model because most drivers have almost no chance "
+                   "and every model ranks them low. Compare the models with each other, not with 1.0.")
+
+    allc = probscore.scorecard(scored_races(folders))
+    if allc:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", name="Perfect calibration",
+                                 line=dict(color="#555", dash="dot")))
+        for m in ("mc", "xgb", "pole"):
+            if m not in allc:
+                continue
+            rows = probscore.calibration(allc[m]["_scores"], allc[m]["_labels"])
+            fig.add_trace(go.Scatter(
+                x=[r["predicted"] for r in rows], y=[r["actual"] for r in rows],
+                mode="lines+markers", name=MODEL_NAMES[m],
+                line=dict(color=MODEL_COLORS[m], width=2), marker=dict(size=9),
+                text=[f"{r['bin']}: {r['n']} driver-races" for r in rows],
+                hovertemplate="%{text}<br>predicted %{x:.0%}, won %{y:.0%}<extra></extra>"))
+        fig.update_xaxes(tickformat=".0%", range=[0, 1], title="Predicted win probability")
+        fig.update_yaxes(tickformat=".0%", range=[0, 1])
+        fig.update_layout(legend=dict(orientation="h", y=-0.2, x=0))
+        bar_chart(fig, "Calibration, all scored rounds: when a model says X%, how often did that driver win", 420, "Actual win rate")
+        st.caption("Points on the dotted line are well calibrated. Above the line, the model was too cautious. "
+                   "Below, too confident. Bins with few drivers move a lot.")
 
 
 def model_tab(config):

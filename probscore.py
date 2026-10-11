@@ -88,7 +88,7 @@ def grid_probs(grid, prior):
 PRIOR_PATH = "grid_prior.json"
 
 
-def load_prior(path=PRIOR_PATH):
+def load_prior(path=None):
     """The 2022-2025 prior written by `history_data.py --write-prior`.
 
     Used to score the pole baseline on live 2026 rounds without a network call.
@@ -96,6 +96,7 @@ def load_prior(path=PRIOR_PATH):
     """
     import json
     import os
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), PRIOR_PATH)
     if not os.path.exists(path):
         return None
     with open(path, encoding="utf-8") as f:
@@ -149,6 +150,93 @@ def backfill(config_path="config.json", races_dir="races"):
         e.update(round_scores(pred, e["actual_winner"], prior))
     Path(config_path).write_text(json.dumps(cfg, indent=2), encoding="utf-8")
     return cfg["accuracy_history"]
+
+
+# Season scorecard ------------------------------------------------------------
+
+MODELS = ("mc", "xgb", "pole")
+
+
+def match_driver(name, names):
+    """Map a result name onto a prediction name. Early files wrote short names."""
+    if name in names:
+        return name
+    same = [n for n in names if n.split()[-1] == name.split()[-1]]
+    return same[0] if len(same) == 1 else name
+
+
+def model_probs(pred, prior=None):
+    """{model: {driver: probability}} for one published prediction.json."""
+    out = {"mc": normalise({p["driver"]: p["win_pct"] for p in pred["predictions"]})}
+    xgb = pred.get("xgboost") or {}
+    rows = [r for r in xgb.get("predictions", []) if r.get("win_prob") is not None]
+    if xgb.get("available") and rows:
+        out["xgb"] = normalise({r["driver"]: r["win_prob"] for r in rows})
+    prior = prior or load_prior()
+    if prior:
+        out["pole"] = grid_probs({p["driver"]: p["grid_pos"] for p in pred["predictions"]}, prior)
+    return out
+
+
+def roc_auc(scores, labels):
+    """Probability a random winner is ranked above a random non-winner (ties count half)."""
+    pos = [s for s, y in zip(scores, labels) if y]
+    neg = [s for s, y in zip(scores, labels) if not y]
+    if not pos or not neg:
+        return None
+    wins = 0.0
+    for a in pos:
+        for b in neg:
+            wins += 1.0 if a > b else 0.5 if a == b else 0.0
+    return wins / (len(pos) * len(neg))
+
+
+def scorecard(races, prior=None):
+    """Season metrics per model from a list of (prediction, winner_name) pairs.
+
+    Only rounds where a model ran count toward that model, so XGBoost
+    (from R4) is scored on fewer rounds than Monte Carlo.
+    """
+    prior = prior or load_prior()
+    acc = {m: {"n": 0, "hit": 0, "top3": 0, "pw": 0.0, "ll": 0.0, "brier": 0.0,
+               "rank": 0, "scores": [], "labels": []} for m in MODELS}
+    for pred, winner in races:
+        for m, probs in model_probs(pred, prior).items():
+            w = match_driver(winner, list(probs))
+            ranked = sorted(probs, key=probs.get, reverse=True)
+            a = acc[m]
+            a["n"] += 1
+            a["hit"] += ranked[0] == w
+            a["top3"] += w in ranked[:3]
+            a["pw"] += probs.get(w, 0.0)
+            a["ll"] += log_loss(probs, w)
+            a["brier"] += brier(probs, w)
+            a["rank"] += (ranked.index(w) + 1) if w in ranked else len(ranked)
+            for d, p in probs.items():
+                a["scores"].append(p)
+                a["labels"].append(d == w)
+    out = {}
+    for m, a in acc.items():
+        if not a["n"]:
+            continue
+        n = a["n"]
+        out[m] = {"rounds": n, "winner_accuracy": a["hit"] / n, "top3_hit": a["top3"] / n,
+                  "avg_p_winner": a["pw"] / n, "log_loss": a["ll"] / n, "brier": a["brier"] / n,
+                  "roc_auc": roc_auc(a["scores"], a["labels"]), "avg_winner_rank": a["rank"] / n,
+                  "_scores": a["scores"], "_labels": a["labels"]}
+    return out
+
+
+def calibration(scores, labels, edges=(0, 0.05, 0.15, 0.3, 0.5, 1.0001)):
+    """Mean predicted vs actual win rate per probability bin."""
+    rows = []
+    for lo, hi in zip(edges, edges[1:]):
+        pts = [(s, y) for s, y in zip(scores, labels) if lo <= s < hi]
+        if pts:
+            rows.append({"bin": f"{lo:.0%}-{min(hi, 1):.0%}", "n": len(pts),
+                         "predicted": sum(s for s, _ in pts) / len(pts),
+                         "actual": sum(y for _, y in pts) / len(pts)})
+    return rows
 
 
 if __name__ == "__main__":

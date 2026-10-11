@@ -121,6 +121,25 @@ def test_xgb_v2_places_r17_at_marina_bay():
     assert abs(sum(p.values()) - 1) < 1e-3 and p["A"] > p["C"]
 
 
+def test_roc_auc_known_values():
+    assert probscore.roc_auc([0.9, 0.1, 0.2], [True, False, False]) == 1.0
+    assert probscore.roc_auc([0.1, 0.9, 0.2], [True, False, False]) == 0.0
+    assert probscore.roc_auc([0.5, 0.5], [True, False]) == 0.5
+
+
+def test_scorecard_counts_only_rounds_a_model_ran():
+    pred_mc = {"predictions": [{"driver": "A", "win_pct": 70, "grid_pos": 1},
+                               {"driver": "B", "win_pct": 30, "grid_pos": 2}], "xgboost": None}
+    pred_both = {"predictions": [{"driver": "A", "win_pct": 40, "grid_pos": 2},
+                                 {"driver": "B", "win_pct": 60, "grid_pos": 1}],
+                 "xgboost": {"available": True, "predictions": [{"driver": "A", "win_prob": 0.8},
+                                                                {"driver": "B", "win_prob": 0.2}]}}
+    card = probscore.scorecard([(pred_mc, "A"), (pred_both, "A")], prior=[0, 0.5, 0.2])
+    assert card["mc"]["rounds"] == 2 and card["xgb"]["rounds"] == 1
+    assert card["mc"]["winner_accuracy"] == 0.5 and card["xgb"]["winner_accuracy"] == 1.0
+    assert card["pole"]["top3_hit"] == 1.0
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0
