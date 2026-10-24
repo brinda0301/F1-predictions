@@ -40,6 +40,9 @@ POLE_WIN_RATE = 0.45
 # Multiplies the track_history feature. Tested at R17 against 2026 rounds 1-16.
 TRACK_HISTORY_SCALE = 0.0   # off from R17: 2026 log loss 1.198 -> 1.083
 
+# Multiplies the adaptability (years in F1) feature. Tested at R18.
+ADAPTABILITY_SCALE = 0.0   # off from R18: combined log loss 1.338 -> 1.308 over 65 races
+
 # FIA target: cars retain 90% downforce when following 20m behind.
 # Was ~70% by end of 2025. Simpler front wings + flatter floors +
 # no beam wing = way less dirty air. Biggest single change for racing.
@@ -265,7 +268,7 @@ def build_features(driver, race_data):
     # 7. ADAPTABILITY
     seasons = exp.get("f1_seasons", 0)
     reg_changes = sum([seasons >= 2, seasons >= 5, seasons >= 9, seasons >= 13])
-    adaptability = min(1.0, reg_changes * 0.25)
+    adaptability = min(1.0, reg_changes * 0.25) * ADAPTABILITY_SCALE
 
     # ---- RACE FACTORS ----
 
