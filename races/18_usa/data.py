@@ -30,8 +30,8 @@ GRID = [
     {'driver': 'Alex Albon', 'team': 'Williams', 'pos': 18, 'q_time': 96.967},
     {'driver': 'Sergio Perez', 'team': 'Cadillac', 'pos': 19, 'q_time': 97.433},
     {'driver': 'Valtteri Bottas', 'team': 'Cadillac', 'pos': 20, 'q_time': 97.523},
-    {'driver': 'Gabriel Bortoleto', 'team': 'Audi', 'pos': 21, 'q_time': 95.632},
-    {'driver': 'Franco Colapinto', 'team': 'Alpine', 'pos': 22, 'q_time': 95.722},
+    {'driver': 'Franco Colapinto', 'team': 'Alpine', 'pos': 21, 'q_time': 95.722},
+    {'driver': 'Gabriel Bortoleto', 'team': 'Audi', 'pos': 22, 'q_time': 95.632},
 ]
 
 FP1_TIMES = {
