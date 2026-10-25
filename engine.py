@@ -40,6 +40,12 @@ POLE_WIN_RATE = 0.45
 # Multiplies the track_history feature. Tested at R17 against 2026 rounds 1-16.
 TRACK_HISTORY_SCALE = 0.0   # off from R17: 2026 log loss 1.198 -> 1.083
 
+# Hand-set per-team constants (energy, fuel, tyres, pit crew, starts, circuit
+# fit) replaced by one neutral value for every team. Tested at R18.
+NEUTRAL_TEAM_CONSTANTS = False   # tested R18: neutral constants worsened combined log loss 1.308 -> 1.362
+# race_pace from the driver's own qualifying gap instead of the team's best lap.
+OWN_RACE_PACE = True   # on from R18: combined log loss 1.308 -> 1.301 over 65 races
+
 # Multiplies the adaptability (years in F1) feature. Tested at R18.
 ADAPTABILITY_SCALE = 0.0   # off from R18: combined log loss 1.338 -> 1.308 over 65 races
 
@@ -233,6 +239,8 @@ def build_features(driver, race_data):
 
     # 3. RACE PACE
     race_pace = max(0.0, 1.0 - (deficit / 3.0))
+    if OWN_RACE_PACE:
+        race_pace = quali_pace if q_time else 0.15
 
     # 4. PRACTICE PACE
     fp1_time = fp1.get(name)
@@ -274,6 +282,8 @@ def build_features(driver, race_data):
 
     # 8. START PROCEDURE
     start_score = min(1.0, max(0.0, 0.5 + start_adv))
+    if NEUTRAL_TEAM_CONSTANTS:
+        start_score = 0.5
 
     # 9. RELIABILITY
     r1_finish = exp.get("r1_finish")
@@ -285,16 +295,18 @@ def build_features(driver, race_data):
         reliability = 0.50
 
     # 10. ENERGY MANAGEMENT
-    energy_score = energy
+    energy_score = 0.6 if NEUTRAL_TEAM_CONSTANTS else energy
 
     # ---- TYRE AND PIT STRATEGY ----
 
     # 11. TYRE MANAGEMENT
-    tyre_mgmt = TYRE_MANAGEMENT.get(team, 0.5)
+    tyre_mgmt = 0.5 if NEUTRAL_TEAM_CONSTANTS else TYRE_MANAGEMENT.get(team, 0.5)
 
     # 12. PIT EXECUTION
     crew_time = PIT_CREW_SPEED.get(team, 2.8)
     pit_exec = max(0.0, min(1.0, (3.5 - crew_time) / 1.5))
+    if NEUTRAL_TEAM_CONSTANTS:
+        pit_exec = 0.5
 
     # 13. TYRE COMPOUND FIT
     compound_hardness = tyre_info.get("hardness", 0.5)
@@ -305,6 +317,8 @@ def build_features(driver, race_data):
 
     # 14. FUEL QUALITY
     fuel = FUEL_SUPPLIERS.get(team, 0.6)
+    if NEUTRAL_TEAM_CONSTANTS:
+        fuel = 0.6
 
     # 15. DIRTY AIR HANDLING
     dirty_air = min(1.0, DIRTY_AIR_RETENTION + deficit * 0.02)
@@ -319,6 +333,8 @@ def build_features(driver, race_data):
         circuit_fit = mech_teams.get(team, 0.6)
     else:
         circuit_fit = 0.7 + race_pace * 0.2
+    if NEUTRAL_TEAM_CONSTANTS:
+        circuit_fit = 0.7
 
     # 17. TRACK TEMPERATURE SENSITIVITY
     track_temp = weather.get("track_temp_c", 30)
