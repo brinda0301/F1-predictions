@@ -8,13 +8,14 @@ Monte Carlo vs XGBoost, predicting every 2026 Grand Prix winner from timing data
 
 1. **The original model added nothing over the grid.** A 48-race backtest of 2024-2025 showed it picked the pole sitter in 45 races and tied "always pick pole" at 28 winners each. Fifteen of eighteen features changed nothing.
 2. **Both models were rebuilt at R17 and tested on races they had not seen.** XGBoost v2 cut log loss from 1.461 to 1.062 and went from 5 to 8 correct winners over 13 rounds. Monte Carlo went from 1.390 to 1.083 on 2026 and from 1.821 to 1.445 on 2024-2025.
-3. **Winner counts barely move. Probability on the winner does.** Hit rate cannot separate a good model from the grid, so every round is scored on log loss.
+3. **Live since the rebuild, both models named both winners and beat the pole baseline.** Monte Carlo log loss 0.333 and XGBoost 0.583 across R17-R18, against 0.684 for always picking pole. Both races were won from pole, the easy case.
+4. **Winner counts barely move. Probability on the winner does.** Hit rate cannot separate a good model from the grid, so every round is scored on log loss.
 
 ## The Two Models
 
 **Monte Carlo** (`engine.py`). Eighteen weighted features per driver feed a softmax, then 100,000 simulated races add safety cars, rain, retirements and strategy noise. Feature weights recalibrate after each race by gradient descent.
 
-**XGBoost v2** (`xgb_model.py`, from R17). A win classifier trained on 2,170 driver rows from 2022-2026. Six timing inputs: qualifying gap to the fastest lap, log grid slot, gap to teammate, sprint finish, circuit overtaking index, margin to the next-fastest car. Monotone constraints guarantee a faster lap, better grid slot or better sprint finish never lowers a driver's chances. Refit after every race.
+**XGBoost v2** (`xgb_model.py`, from R17). A win classifier trained on 2022-2026 races, 2,214 driver rows after R18. Six timing inputs: qualifying gap to the fastest lap, log grid slot, gap to teammate, sprint finish, circuit overtaking index, margin to the next-fastest car. Monotone constraints guarantee a faster lap, better grid slot or better sprint finish never lowers a driver's chances. Refit after every race.
 
 XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranked the pole sitter tenth after he won the sprint. Its code is in git history.
 
@@ -38,14 +39,22 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | 14 | Spanish GP (Madring) | Lando Norris (25.33%) | Kimi Antonelli | Kimi Antonelli | Miss | Correct |
 | 15 | Azerbaijan GP | George Russell (90.25%) | George Russell | George Russell | Correct | Correct |
 | 16 | Bahrain GP in Malaysia (Sepang) | Max Verstappen (40.97%) | Isack Hadjar | Max Verstappen | Correct | Miss |
- 
 | 17 | Singapore GP | Max Verstappen (77.0%) | Max Verstappen (53.5%) | Max Verstappen | Correct | Correct |
+| 18 | United States GP | Kimi Antonelli (66.7%) | Kimi Antonelli (58.3%) | Kimi Antonelli | Correct | Correct |
+| 19 | Mexico City GP | Lewis Hamilton (40.5%) | Lewis Hamilton (44.9%) | pending | | |
 
-**After 17 races**: Monte Carlo 10/17 winners (59%). XGBoost 6/14 (43%). Always picking pole: 12/17 (71%).
+**After 18 races**: Monte Carlo 11/18 winners (61%). XGBoost 7/15 (47%). Always picking pole: 13/18 (72%).
 
 **Log loss, R1-R16 as published** (lower is better): Monte Carlo 1.490, XGBoost v1 1.461 over 13 rounds, pole baseline 1.086. The pole baseline beat both published models. That gap is what the R17 upgrades target.
 
-**R17 Singapore, first race with the rebuilt models**: Verstappen won from pole. Log loss: Monte Carlo 0.261 (77.0% on the winner), XGBoost 0.626 (53.5%), pole baseline 0.684. Both models beat the baseline. XGBoost had Leclerc second, and he finished second. Monte Carlo had Hamilton second on experience, and he finished sixth. One race is one data point. The rebuilt-model scorecard on the dashboard grows from here.
+**Rebuilt models, live** (log loss, lower is better):
+
+| Race | Winner | Monte Carlo | XGBoost | Pole baseline | Note |
+| --- | --- | :---: | :---: | :---: | --- |
+| R17 Singapore | Verstappen, from pole | 0.261 | 0.626 | 0.684 | XGBoost had Leclerc P2, correct. Monte Carlo had Hamilton P2 on experience, he finished P6 |
+| R18 United States | Antonelli, from pole | 0.405 | 0.539 | 0.684 | Monte Carlo called the exact podium. Red Bull P3 and P6, as Monte Carlo's team constants implied |
+
+Both races were won from pole. The rebuilt models have not yet faced a race won from further back, where the old Monte Carlo scored its worst.
 
 Results R1-R9 were first entered by hand and re-pulled from the timing API at R14. Four races were decided by mechanical failure: Canada, Barcelona, Britain, Belgium.
 
@@ -98,6 +107,21 @@ Walk-forward over the 13 rounds v1 ran, each round trained only on races before 
 Checked together after the cleanup: these settings score 1.355 across all 64 races. Putting the recovery bonus back scores 1.362.
 
 Caveat: the 2026 Monte Carlo figures use weights calibrated through R16, so they flatter the engine slightly. The 2024-2025 figures do not have that problem.
+
+### Changes at R18, then a freeze
+
+Each change below was tested on 65 races (17 from 2026, 48 rebuilt from 2024-2025) and kept only if log loss improved on both sets.
+
+| Change | 2026 | 2024-2025 | Kept |
+| --- | :---: | :---: | :---: |
+| Adaptability (years in F1) off | 1.036 to 0.947 | 1.445 to 1.435 | Yes |
+| Race pace from the driver's own qualifying gap, not the team's best lap | 0.947 to 0.944 | 1.435 to 1.428 | Yes |
+| Neutral values for hand-set team constants | 0.947 to 1.019 | 1.435 to 1.484 | No |
+| Teammate gap capped at 0.3s (tested before R19) | worse for Monte Carlo on both sets; XGBoost better on 2026, worse on 2022-2025 | | No |
+
+Practice pace at R18 used each driver's best lap across FP1-FP3, because FastF1 returned no data. Earlier races used FP1 only.
+
+From R19 to the end of the season both models are frozen. No setting changes, so the last six races are a clean out-of-sample test.
 
 The first R17 prediction (commit 3517610) used the old settings: Monte Carlo Verstappen 48.22%, XGBoost Leclerc 36.0%. It was re-run on the same grid before the race and stays in git history.
 
@@ -177,6 +201,10 @@ Python 3.12, NumPy, XGBoost, scikit-learn, FastF1, Streamlit, Plotly. Race data 
 - **Practice-pace fallback**: a driver missing from FP1 scores 0.3, so a rookie-run absence reads as slowness. Use the median instead.
 - **Mean position error**: still counts a retirement from the front as a 17-place miss.
 - **Ensemble**: XGBoost picks the podium set, Monte Carlo orders it.
+- **Monte Carlo overconfidence**: the halved temperature leaves little probability for drivers behind the favourite (Antonelli 0.3% at Singapore, finished P3). Test blending with the pole prior on data not used to choose settings.
+- **Practice pace for XGBoost**: Leclerc topped FP1 and FP2 at Austin and finished P2 with 3.6% from XGBoost, which reads no practice data.
+- **Refresh hand-set team constants** from measured pace. Neutral values failed at R18, so the constants carry signal but are stale.
+- **Teammate gap**: rewards beating a teammate who had a bad session (Norris P3 from P6 at Mexico). A cap failed at R19. Revisit with the full season.
 
 Detailed race analyses, the R14 audit and the data bugs: [docs/season-notes.md](docs/season-notes.md).
 
