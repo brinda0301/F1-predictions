@@ -46,6 +46,9 @@ NEUTRAL_TEAM_CONSTANTS = False   # tested R18: neutral constants worsened combin
 # race_pace from the driver's own qualifying gap instead of the team's best lap.
 OWN_RACE_PACE = True   # on from R18: combined log loss 1.308 -> 1.301 over 65 races
 
+# Seconds; teammate gaps beyond this count as this. None = uncapped (1s scale).
+TEAMMATE_GAP_CAP = None   # tested R19: caps of 0.5, 0.3, 0.15s all worsened Monte Carlo (1.288 -> 1.295, 1.302, 1.309)
+
 # Multiplies the adaptability (years in F1) feature. Tested at R18.
 ADAPTABILITY_SCALE = 0.0   # off from R18: combined log loss 1.338 -> 1.308 over 65 races
 
@@ -267,7 +270,12 @@ def build_features(driver, race_data):
             tm_time = d["q_time"]
             break
     if q_time and tm_time:
-        teammate_gap = min(1.0, max(0.0, (tm_time - q_time + 1.0) / 2.0))
+        d = tm_time - q_time
+        if TEAMMATE_GAP_CAP:
+            # A bad session for the teammate should not inflate the driver.
+            # Gaps beyond the cap count as the cap, then rescale to 0..1.
+            d = max(-TEAMMATE_GAP_CAP, min(TEAMMATE_GAP_CAP, d)) / TEAMMATE_GAP_CAP
+        teammate_gap = min(1.0, max(0.0, (d + 1.0) / 2.0))
     elif q_time:
         teammate_gap = 0.7
     else:
