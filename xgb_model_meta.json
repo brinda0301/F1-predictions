@@ -780,6 +780,10 @@
    [
     "2025-10-19",
     0.8404
+   ],
+   [
+    "2026-10-25",
+    0.9123
    ]
   ],
   "interlagos": [
@@ -1237,7 +1241,7 @@
    "date": "2026-12-06"
   }
  },
- "ot_mean": 0.75336,
+ "ot_mean": 0.75395,
  "features": [
   "gap",
   "log_grid",
@@ -1266,8 +1270,8 @@
   "random_state": 42,
   "verbosity": 0
  },
- "training_races": 108,
- "training_rows": 2192,
+ "training_races": 109,
+ "training_rows": 2214,
  "seasons": [
   2022,
   2023,
@@ -1275,5 +1279,5 @@
   2025,
   2026
  ],
- "last_race": "2026 R17 Singapore Grand Prix"
+ "last_race": "2026 R18 United States Grand Prix"
 }

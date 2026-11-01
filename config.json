@@ -494,6 +494,34 @@
       "xgb_brier": 0.2888,
       "pole_log_loss": 0.6843,
       "pole_brier": 0.2966
+    },
+    {
+      "round": 18,
+      "race": "Usa",
+      "predicted_winner": "Andrea Kimi Antonelli",
+      "predicted_win_pct": 66.71,
+      "actual_winner": "Andrea Kimi Antonelli",
+      "correct": true,
+      "podium_predicted": [
+        "Andrea Kimi Antonelli",
+        "Charles Leclerc",
+        "Max Verstappen"
+      ],
+      "podium_actual": [
+        "Andrea Kimi Antonelli",
+        "Charles Leclerc",
+        "Max Verstappen"
+      ],
+      "podium_overlap": 3,
+      "mean_position_error": 0.0,
+      "xgb_winner_correct": true,
+      "xgb_podium_overlap": 2,
+      "mc_log_loss": 0.4047,
+      "mc_brier": 0.1247,
+      "xgb_log_loss": 0.5395,
+      "xgb_brier": 0.221,
+      "pole_log_loss": 0.6843,
+      "pole_brier": 0.2966
     }
   ],
   "engine_versions": [
