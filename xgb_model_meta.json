@@ -922,6 +922,10 @@
    [
     "2025-10-26",
     0.8284
+   ],
+   [
+    "2026-11-01",
+    0.7451
    ]
   ],
   "baku": [
@@ -1241,7 +1245,7 @@
    "date": "2026-12-06"
   }
  },
- "ot_mean": 0.75395,
+ "ot_mean": 0.75392,
  "features": [
   "gap",
   "log_grid",
@@ -1270,8 +1274,8 @@
   "random_state": 42,
   "verbosity": 0
  },
- "training_races": 109,
- "training_rows": 2214,
+ "training_races": 110,
+ "training_rows": 2236,
  "seasons": [
   2022,
   2023,
@@ -1279,5 +1283,5 @@
   2025,
   2026
  ],
- "last_race": "2026 R18 United States Grand Prix"
+ "last_race": "2026 R19 Mexico City Grand Prix"
 }

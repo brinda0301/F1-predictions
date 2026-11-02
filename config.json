@@ -522,6 +522,34 @@
       "xgb_brier": 0.221,
       "pole_log_loss": 0.6843,
       "pole_brier": 0.2966
+    },
+    {
+      "round": 19,
+      "race": "Mexico",
+      "predicted_winner": "Lewis Hamilton",
+      "predicted_win_pct": 40.52,
+      "actual_winner": "Max Verstappen",
+      "correct": false,
+      "podium_predicted": [
+        "Lewis Hamilton",
+        "George Russell",
+        "Lando Norris"
+      ],
+      "podium_actual": [
+        "Max Verstappen",
+        "Lewis Hamilton",
+        "Andrea Kimi Antonelli"
+      ],
+      "podium_overlap": 1,
+      "mean_position_error": 2.33,
+      "xgb_winner_correct": false,
+      "xgb_podium_overlap": 1,
+      "mc_log_loss": 3.3902,
+      "mc_brier": 1.1932,
+      "xgb_log_loss": 4.0285,
+      "xgb_brier": 1.3519,
+      "pole_log_loss": 4.5309,
+      "pole_brier": 1.2839
     }
   ],
   "engine_versions": [

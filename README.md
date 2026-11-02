@@ -8,7 +8,7 @@ Monte Carlo vs XGBoost, predicting every 2026 Grand Prix winner from timing data
 
 1. **The original model added nothing over the grid.** A 48-race backtest of 2024-2025 showed it picked the pole sitter in 45 races and tied "always pick pole" at 28 winners each. Fifteen of eighteen features changed nothing.
 2. **Both models were rebuilt at R17 and tested on races they had not seen.** XGBoost v2 cut log loss from 1.461 to 1.062 and went from 5 to 8 correct winners over 13 rounds. Monte Carlo went from 1.390 to 1.083 on 2026 and from 1.821 to 1.445 on 2024-2025.
-3. **Live since the rebuild, both models named both winners and beat the pole baseline.** Monte Carlo log loss 0.333 and XGBoost 0.583 across R17-R18, against 0.684 for always picking pole. Both races were won from pole, the easy case.
+3. **Live since the rebuild, both models beat the pole baseline on log loss in all three races.** Average across R17-R19: Monte Carlo 1.352, XGBoost 1.731, always picking pole 1.966. Both models named the R17 and R18 winners, both from pole, and missed R19, won by Verstappen from P5.
 4. **Winner counts barely move. Probability on the winner does.** Hit rate cannot separate a good model from the grid, so every round is scored on log loss.
 
 ## The Two Models
@@ -41,9 +41,9 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | 16 | Bahrain GP in Malaysia (Sepang) | Max Verstappen (40.97%) | Isack Hadjar | Max Verstappen | Correct | Miss |
 | 17 | Singapore GP | Max Verstappen (77.0%) | Max Verstappen (53.5%) | Max Verstappen | Correct | Correct |
 | 18 | United States GP | Kimi Antonelli (66.7%) | Kimi Antonelli (58.3%) | Kimi Antonelli | Correct | Correct |
-| 19 | Mexico City GP | Lewis Hamilton (40.5%) | Lewis Hamilton (44.9%) | pending | | |
+| 19 | Mexico City GP | Lewis Hamilton (40.5%) | Lewis Hamilton (44.9%) | Max Verstappen | Miss | Miss |
 
-**After 18 races**: Monte Carlo 11/18 winners (61%). XGBoost 7/15 (47%). Always picking pole: 13/18 (72%).
+**After 19 races**: Monte Carlo 11/19 winners (58%). XGBoost 7/16 (44%). Always picking pole: 13/19 (68%).
 
 **Log loss, R1-R16 as published** (lower is better): Monte Carlo 1.490, XGBoost v1 1.461 over 13 rounds, pole baseline 1.086. The pole baseline beat both published models. That gap is what the R17 upgrades target.
 
@@ -53,8 +53,9 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | --- | --- | :---: | :---: | :---: | --- |
 | R17 Singapore | Verstappen, from pole | 0.261 | 0.626 | 0.684 | XGBoost had Leclerc P2, correct. Monte Carlo had Hamilton P2 on experience, he finished P6 |
 | R18 United States | Antonelli, from pole | 0.405 | 0.539 | 0.684 | Monte Carlo called the exact podium. Red Bull P3 and P6, as Monte Carlo's team constants implied |
+| R19 Mexico City | Verstappen, from P5 | 3.390 | 4.029 | 4.531 | First race won from off pole since the rebuild. Monte Carlo had Verstappen 6th at 3.4%, XGBoost 5th at 1.8%. Both models had Russell P2, he finished P6. Norris, the pick questioned before the race, finished P5 |
 
-Both races were won from pole. The rebuilt models have not yet faced a race won from further back, where the old Monte Carlo scored its worst.
+Mexico is the case flagged in the season review: the sharper Monte Carlo puts little on drivers behind the favourite, so a P5 winner costs about 3.4. Both models still lost less than the pole baseline, which gives P5 about 1%. First of the six frozen races.
 
 Results R1-R9 were first entered by hand and re-pulled from the timing API at R14. Four races were decided by mechanical failure: Canada, Barcelona, Britain, Belgium.
 
