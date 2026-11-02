@@ -43,6 +43,8 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | 18 | United States GP | Kimi Antonelli (66.7%) | Kimi Antonelli (58.3%) | Kimi Antonelli | Correct | Correct |
 | 19 | Mexico City GP | Lewis Hamilton (40.5%) | Lewis Hamilton (44.9%) | Max Verstappen | Miss | Miss |
 
+**Kimi Antonelli clinched the 2026 title at Mexico City** with a third place and four races left, the youngest champion in F1 history at 20. He won 9 of 19 races. Monte Carlo picked him to win 5 times and was right 4 of those.
+
 **After 19 races**: Monte Carlo 11/19 winners (58%). XGBoost 7/16 (44%). Always picking pole: 13/19 (68%).
 
 **Log loss, R1-R16 as published** (lower is better): Monte Carlo 1.490, XGBoost v1 1.461 over 13 rounds, pole baseline 1.086. The pole baseline beat both published models. That gap is what the R17 upgrades target.
