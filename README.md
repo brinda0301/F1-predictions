@@ -42,6 +42,7 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | 17 | Singapore GP | Max Verstappen (77.0%) | Max Verstappen (53.5%) | Max Verstappen | Correct | Correct |
 | 18 | United States GP | Kimi Antonelli (66.7%) | Kimi Antonelli (58.3%) | Kimi Antonelli | Correct | Correct |
 | 19 | Mexico City GP | Lewis Hamilton (40.5%) | Lewis Hamilton (44.9%) | Max Verstappen | Miss | Miss |
+| 20 | Brazilian GP | Lando Norris (60.56%) | Lando Norris (77.0%) | pending | | |
 
 **Kimi Antonelli clinched the 2026 title at Mexico City** with a third place and four races left, the youngest champion in F1 history at 20. He won 9 of 19 races. Monte Carlo picked him to win 5 times and was right 4 of those.
 
@@ -58,6 +59,8 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | R19 Mexico City | Verstappen, from P5 | 3.390 | 4.029 | 4.531 | First race won from off pole since the rebuild. Monte Carlo had Verstappen 6th at 3.4%, XGBoost 5th at 1.8%. Both models had Russell P2, he finished P6. Norris, the pick questioned before the race, finished P5 |
 
 Mexico is the case flagged in the season review: the sharper Monte Carlo puts little on drivers behind the favourite, so a P5 winner costs about 3.4. Both models still lost less than the pole baseline, which gives P5 about 1%. First of the six frozen races.
+
+**R20 Brazil, wet qualifying.** Rain made the track about 3s faster from Q1 to Q3, so lap times from different sessions are not comparable. The prediction uses each driver's Q1 lap, the only session with a lap from all 22 drivers on the same track. Using last-session laps instead put Verstappen, P3 in Q1 and starting P21 after a 30-place engine penalty, 3.8s off pole and at 0.3%. With Q1 laps both models give him a real chance: Monte Carlo 8.4%, XGBoost 11.7%. Both still pick Norris from pole. The rejected version is recorded in `races/20_brazil/data.py`. Data choice only, no model settings changed.
 
 Results R1-R9 were first entered by hand and re-pulled from the timing API at R14. Four races were decided by mechanical failure: Canada, Barcelona, Britain, Belgium.
 
