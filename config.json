@@ -550,6 +550,34 @@
       "xgb_brier": 1.3519,
       "pole_log_loss": 4.5309,
       "pole_brier": 1.2839
+    },
+    {
+      "round": 20,
+      "race": "Brazil",
+      "predicted_winner": "Lando Norris",
+      "predicted_win_pct": 60.56,
+      "actual_winner": "Lando Norris",
+      "correct": true,
+      "podium_predicted": [
+        "Lando Norris",
+        "George Russell",
+        "Max Verstappen"
+      ],
+      "podium_actual": [
+        "Lando Norris",
+        "Max Verstappen",
+        "Isack Hadjar"
+      ],
+      "podium_overlap": 2,
+      "mean_position_error": 1.0,
+      "xgb_winner_correct": true,
+      "xgb_podium_overlap": 2,
+      "mc_log_loss": 0.5016,
+      "mc_brier": 0.1867,
+      "xgb_log_loss": 0.2614,
+      "xgb_brier": 0.072,
+      "pole_log_loss": 0.6843,
+      "pole_brier": 0.2966
     }
   ],
   "engine_versions": [

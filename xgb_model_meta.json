@@ -830,6 +830,10 @@
    [
     "2025-11-09",
     0.6838
+   ],
+   [
+    "2026-11-08",
+    0.3759
    ]
   ],
   "yas_marina": [
@@ -925,7 +929,7 @@
    ],
    [
     "2026-11-01",
-    0.7451
+    0.6005
    ]
   ],
   "baku": [
@@ -1245,7 +1249,7 @@
    "date": "2026-12-06"
   }
  },
- "ot_mean": 0.75392,
+ "ot_mean": 0.75199,
  "features": [
   "gap",
   "log_grid",
@@ -1274,8 +1278,8 @@
   "random_state": 42,
   "verbosity": 0
  },
- "training_races": 110,
- "training_rows": 2236,
+ "training_races": 111,
+ "training_rows": 2258,
  "seasons": [
   2022,
   2023,
@@ -1283,5 +1287,5 @@
   2025,
   2026
  ],
- "last_race": "2026 R19 Mexico City Grand Prix"
+ "last_race": "2026 R20 Brazilian Grand Prix"
 }

@@ -8,7 +8,7 @@ Monte Carlo vs XGBoost, predicting every 2026 Grand Prix winner from timing data
 
 1. **The original model added nothing over the grid.** A 48-race backtest of 2024-2025 showed it picked the pole sitter in 45 races and tied "always pick pole" at 28 winners each. Fifteen of eighteen features changed nothing.
 2. **Both models were rebuilt at R17 and tested on races they had not seen.** XGBoost v2 cut log loss from 1.461 to 1.062 and went from 5 to 8 correct winners over 13 rounds. Monte Carlo went from 1.390 to 1.083 on 2026 and from 1.821 to 1.445 on 2024-2025.
-3. **Live since the rebuild, both models beat the pole baseline on log loss in all three races.** Average across R17-R19: Monte Carlo 1.352, XGBoost 1.731, always picking pole 1.966. Both models named the R17 and R18 winners, both from pole, and missed R19, won by Verstappen from P5.
+3. **Live since the rebuild, both models beat the pole baseline on log loss in all four races.** Average across R17-R20: Monte Carlo 1.139, XGBoost 1.364, always picking pole 1.646. Both models named the R17, R18 and R20 winners, all from pole, and missed R19, won by Verstappen from P5.
 4. **Winner counts barely move. Probability on the winner does.** Hit rate cannot separate a good model from the grid, so every round is scored on log loss.
 
 ## The Two Models
@@ -42,11 +42,11 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | 17 | Singapore GP | Max Verstappen (77.0%) | Max Verstappen (53.5%) | Max Verstappen | Correct | Correct |
 | 18 | United States GP | Kimi Antonelli (66.7%) | Kimi Antonelli (58.3%) | Kimi Antonelli | Correct | Correct |
 | 19 | Mexico City GP | Lewis Hamilton (40.5%) | Lewis Hamilton (44.9%) | Max Verstappen | Miss | Miss |
-| 20 | Brazilian GP | Lando Norris (60.56%) | Lando Norris (77.0%) | pending | | |
+| 20 | Brazilian GP | Lando Norris (60.56%) | Lando Norris (77.0%) | Lando Norris | Correct | Correct |
 
-**Kimi Antonelli clinched the 2026 title at Mexico City** with a third place and four races left, the youngest champion in F1 history at 20. He won 9 of 19 races. Monte Carlo picked him to win 5 times and was right 4 of those.
+**Kimi Antonelli clinched the 2026 title at Mexico City** with a third place and four races left, the youngest champion in F1 history at 20. He won 9 of the first 20 races. Monte Carlo picked him to win 5 times and was right 4 of those.
 
-**After 19 races**: Monte Carlo 11/19 winners (58%). XGBoost 7/16 (44%). Always picking pole: 13/19 (68%).
+**After 20 races**: Monte Carlo 12/20 winners (60%). XGBoost 8/17 (47%). Always picking pole: 14/20 (70%).
 
 **Log loss, R1-R16 as published** (lower is better): Monte Carlo 1.490, XGBoost v1 1.461 over 13 rounds, pole baseline 1.086. The pole baseline beat both published models. That gap is what the R17 upgrades target.
 
@@ -57,10 +57,13 @@ XGBoost v1, R4-R16, was a position regressor on 2026 data alone. At R17 it ranke
 | R17 Singapore | Verstappen, from pole | 0.261 | 0.626 | 0.684 | XGBoost had Leclerc P2, correct. Monte Carlo had Hamilton P2 on experience, he finished P6 |
 | R18 United States | Antonelli, from pole | 0.405 | 0.539 | 0.684 | Monte Carlo called the exact podium. Red Bull P3 and P6, as Monte Carlo's team constants implied |
 | R19 Mexico City | Verstappen, from P5 | 3.390 | 4.029 | 4.531 | First race won from off pole since the rebuild. Monte Carlo had Verstappen 6th at 3.4%, XGBoost 5th at 1.8%. Both models had Russell P2, he finished P6. Norris, the pick questioned before the race, finished P5 |
+| R20 Brazil | Norris, from pole | 0.502 | 0.261 | 0.684 | Verstappen P2 from P21. Monte Carlo had him P3 on the podium at 38%. Hadjar P3 from P5. Antonelli, P2 on the grid, finished P5 |
 
 Mexico is the case flagged in the season review: the sharper Monte Carlo puts little on drivers behind the favourite, so a P5 winner costs about 3.4. Both models still lost less than the pole baseline, which gives P5 about 1%. First of the six frozen races.
 
 **R20 Brazil, wet qualifying.** Rain made the track about 3s faster from Q1 to Q3, so lap times from different sessions are not comparable. The prediction uses each driver's Q1 lap, the only session with a lap from all 22 drivers on the same track. Using last-session laps instead put Verstappen, P3 in Q1 and starting P21 after a 30-place engine penalty, 3.8s off pole and at 0.3%. With Q1 laps both models give him a real chance: Monte Carlo 8.4%, XGBoost 11.7%. Both still pick Norris from pole. The rejected version is recorded in `races/20_brazil/data.py`. Data choice only, no model settings changed.
+
+**R20 result: Q1 laps or last-session laps?** Norris won from pole, Verstappen came from P21 to P2. On the winner alone, the rejected last-session version would have scored better (Monte Carlo 0.352 vs 0.502, XGBoost 0.143 vs 0.261), because it put more on Norris. On pace, Q1 laps read the race better: Monte Carlo's podium with Q1 laps was Norris, Russell, Verstappen, two of three correct, with Verstappen at 38%. With last-session laps his podium chance was 4.5%. One race settles nothing. The rule for wet qualifying is on the off-season list.
 
 Results R1-R9 were first entered by hand and re-pulled from the timing API at R14. Four races were decided by mechanical failure: Canada, Barcelona, Britain, Belgium.
 
@@ -211,6 +214,7 @@ Python 3.12, NumPy, XGBoost, scikit-learn, FastF1, Streamlit, Plotly. Race data 
 - **Practice pace for XGBoost**: Leclerc topped FP1 and FP2 at Austin and finished P2 with 3.6% from XGBoost, which reads no practice data.
 - **Refresh hand-set team constants** from measured pace. Neutral values failed at R18, so the constants carry signal but are stale.
 - **Teammate gap**: rewards beating a teammate who had a bad session (Norris P3 from P6 at Mexico). A cap failed at R19. Revisit with the full season.
+- **Wet qualifying**: lap times from different sessions are not comparable when the track changes. R20 used Q1 laps for everyone. Test both rules on past wet sessions before adopting one.
 
 Detailed race analyses, the R14 audit and the data bugs: [docs/season-notes.md](docs/season-notes.md).
 
